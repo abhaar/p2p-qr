@@ -20,17 +20,18 @@ message GetBlockEventsRequest {
 
 message BlockchainEvent {
   string idempotency_id = 1;
-  string block_hash = 3;
-  uint64 block_height = 4;
-  string tx_hash = 5;
-  string from = 6;
-  string to = 7;
-  string amount = 8;
+  string tx_hash = 2;
+  string token_id = 3;
+  string from = 4;
+  string to = 5;
+  string amount = 6;
 }
 
 message BlockchainEvents {
   network.NetworkId network_id = 1;
-  repeated BlockchainEvent events = 2;
+  string block_hash = 2;
+  uint64 block_height = 3;
+  repeated BlockchainEvent events = 4;
 }
 
 service ProtocolService {

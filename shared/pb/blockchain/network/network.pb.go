@@ -5,14 +5,14 @@
 // source: blockchain/network/network.proto
 
 // Package network defines blockchain network identifiers.
+
 package network
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -96,12 +96,10 @@ func file_blockchain_network_network_proto_rawDescGZIP() []byte {
 	return file_blockchain_network_network_proto_rawDescData
 }
 
-var (
-	file_blockchain_network_network_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-	file_blockchain_network_network_proto_goTypes   = []any{
-		(NetworkId)(0), // 0: network.NetworkId
-	}
-)
+var file_blockchain_network_network_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_blockchain_network_network_proto_goTypes = []any{
+	(NetworkId)(0), // 0: network.NetworkId
+}
 var file_blockchain_network_network_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
 	0, // [0:0] is the sub-list for method input_type
