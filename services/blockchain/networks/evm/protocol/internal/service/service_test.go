@@ -6,9 +6,22 @@ import (
 	"time"
 
 	"github.com/p2p/blockchain/evm/protocol/v2/internal/domain"
+	"github.com/p2p/shared/pb/blockchain/address"
 	network "github.com/p2p/shared/pb/blockchain/network"
 	"github.com/p2p/shared/pb/blockchain/protocol"
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
+
+type mockAddressClient struct {
+	address.AddressServiceClient
+}
+
+func (m *mockAddressClient) GetCustodyAddresses(ctx context.Context, in *address.GetCustodyAddressesRequest, opts ...grpc.CallOption) (*address.GetCustodyAddressesResponse, error) {
+	return &address.GetCustodyAddressesResponse{
+		Addresses: in.GetAddresses(),
+	}, nil
+}
 
 func TestBlockchainService(t *testing.T) {
 	// Initialize EVM client with the provided Alchemy Sepolia endpoint
@@ -24,7 +37,9 @@ func TestBlockchainService(t *testing.T) {
 		BlockchainNodeEndpoint: endpoint,
 	}
 
-	svc := NewBlockchainService(client, cfg)
+	mockAddrClient := &mockAddressClient{}
+	logger := zap.NewNop()
+	svc := NewBlockchainService(client, mockAddrClient, cfg, logger)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

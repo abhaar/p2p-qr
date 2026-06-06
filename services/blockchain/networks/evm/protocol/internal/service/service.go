@@ -8,28 +8,34 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/p2p/blockchain/evm/protocol/v2/internal/domain"
+	"github.com/p2p/shared/pb/blockchain/address"
 	"github.com/p2p/shared/pb/blockchain/protocol"
+	"go.uber.org/zap"
 )
 
 // BlockchainService implements the protocol.ProtocolServiceServer interface for EVM networks.
 type BlockchainService struct {
 	protocol.UnimplementedProtocolServiceServer
-	cfg    Config
-	client domain.EVMClient
+	logger               *zap.Logger
+	cfg                  Config
+	evmClient            domain.EVMClient
+	addressServiceClient address.AddressServiceClient
 }
 
 // NewBlockchainService creates a new BlockchainService instance.
-func NewBlockchainService(client domain.EVMClient, cfg Config) *BlockchainService {
+func NewBlockchainService(client domain.EVMClient, addressServiceClient address.AddressServiceClient, cfg Config, logger *zap.Logger) *BlockchainService {
 	return &BlockchainService{
-		cfg:    cfg,
-		client: client,
+		logger:               logger,
+		cfg:                  cfg,
+		evmClient:            client,
+		addressServiceClient: addressServiceClient,
 	}
 }
 
 // GetLatestBlock retrieves the latest block from the EVM network.
 func (s *BlockchainService) GetLatestBlock(ctx context.Context, req *protocol.GetLatestBlockRequest) (*protocol.GetLatestBlockResponse, error) {
 	var latestBlockNumber hexutil.Uint64
-	err := s.client.RPCClient().CallContext(ctx, &latestBlockNumber, "eth_blockNumber")
+	err := s.evmClient.RPCClient().CallContext(ctx, &latestBlockNumber, "eth_blockNumber")
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +59,7 @@ func (s *BlockchainService) GetBlockEvents(ctx context.Context, req *protocol.Ge
 
 	var receipts []*types.Receipt
 	blockHeightHexStr := hexutil.EncodeUint64(req.GetBlockHeight())
-	err := s.client.RPCClient().CallContext(ctx, &receipts, "eth_getBlockReceipts", blockHeightHexStr)
+	err := s.evmClient.RPCClient().CallContext(ctx, &receipts, "eth_getBlockReceipts", blockHeightHexStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get receipts for block %d: %s", req.GetBlockHeight(), err.Error())
 	}
@@ -64,7 +70,7 @@ func (s *BlockchainService) GetBlockEvents(ctx context.Context, req *protocol.Ge
 	blockHash := receipts[0].BlockHash.String()
 	blockNumber := receipts[0].BlockNumber.Uint64()
 
-	// filter relevant events
+	// TODO: DO NOT USE Transport Layer Message. Replace With Domain Data Models.
 	var events []*protocol.BlockchainEvent
 	for _, receipt := range receipts {
 		if receipt.Status != types.ReceiptStatusSuccessful {
@@ -82,17 +88,23 @@ func (s *BlockchainService) GetBlockEvents(ctx context.Context, req *protocol.Ge
 		}
 	}
 
+	relevantEvents, err := s.filterRelevantEvents(ctx, events)
+	if err != nil {
+		s.logger.Error("failed to filter events", zap.Error(err))
+		return nil, err
+	}
+
 	return &protocol.BlockchainEvents{
 		BlockHash:   blockHash,
 		BlockHeight: blockNumber,
 		NetworkId:   s.cfg.NetworkID,
-		Events:      events,
+		Events:      relevantEvents,
 	}, nil
 }
 
 func (s *BlockchainService) getHeaderByNumber(ctx context.Context, number string) (*types.Header, error) {
 	var header *types.Header
-	err := s.client.RPCClient().CallContext(ctx, &header, "eth_getBlockByNumber", number, false)
+	err := s.evmClient.RPCClient().CallContext(ctx, &header, "eth_getBlockByNumber", number, false)
 	if err != nil {
 		return nil, err
 	}
@@ -102,4 +114,48 @@ func (s *BlockchainService) getHeaderByNumber(ctx context.Context, number string
 	}
 
 	return header, nil
+}
+
+func (s *BlockchainService) filterRelevantEvents(ctx context.Context, events []*protocol.BlockchainEvent) ([]*protocol.BlockchainEvent, error) {
+	addressSet := make(map[string]struct{})
+	for _, event := range events {
+		addressSet[event.GetFrom()] = struct{}{}
+		addressSet[event.GetTo()] = struct{}{}
+	}
+
+	addressList := make([]string, 0)
+	for address := range addressSet {
+		addressList = append(addressList, address)
+	}
+
+	relevantAddresses, err := s.addressServiceClient.GetCustodyAddresses(ctx, &address.GetCustodyAddressesRequest{
+		Addresses: addressList,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	relevantAddressSet := make(map[string]struct{})
+	for _, address := range relevantAddresses.GetAddresses() {
+		relevantAddressSet[address] = struct{}{}
+	}
+
+	filteredEvents := make([]*protocol.BlockchainEvent, 0)
+	for _, event := range events {
+		if _, ok := relevantAddressSet[event.GetFrom()]; ok {
+			filteredEvents = append(filteredEvents, event)
+			continue
+		}
+
+		if _, ok := relevantAddressSet[event.GetTo()]; ok {
+			filteredEvents = append(filteredEvents, event)
+		}
+	}
+
+	s.logger.Info("filtered out irrelevant blockchain events",
+		zap.Int("total", len(events)),
+		zap.Int("relevant", len(filteredEvents)),
+	)
+
+	return filteredEvents, nil
 }

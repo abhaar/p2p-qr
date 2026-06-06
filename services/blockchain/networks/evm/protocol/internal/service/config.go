@@ -20,19 +20,22 @@ type Config struct {
 	GRPCServicePort        string
 	NetworkID              network.NetworkId
 	BlockchainNodeEndpoint string `mapstructure:"blockchain_node_endpoint"`
+	AddressServiceEndpoint string
 }
 
 type rawConfig struct {
 	GRPCServicePort        string
 	NetworkID              string `mapstructure:"network_id"`
 	BlockchainNodeEndpoint string `mapstructure:"blockchain_node_endpoint"`
+	AddressServiceEndpoint string `mapstructure:"address_service_endpoint"`
 }
 
 func NewConfig() (*Config, error) {
 	var (
-		flagPort     = flag.String("grpc-port", "", "gRPC service port")
-		flagNetwork  = flag.String("network-id", "", "Network ID")
-		flagEndpoint = flag.String("node-endpoint", "", "Blockchain node endpoint")
+		flagPort            = flag.String("grpc-port", "", "gRPC service port")
+		flagNetwork         = flag.String("network-id", "", "Network ID")
+		flagEndpoint        = flag.String("node-endpoint", "", "Blockchain node endpoint")
+		flagAddressEndpoint = flag.String("address-service-endpoint", "", "Address service endpoint")
 	)
 
 	if !flag.Parsed() {
@@ -61,10 +64,18 @@ func NewConfig() (*Config, error) {
 	if *flagEndpoint != "" {
 		raw.BlockchainNodeEndpoint = *flagEndpoint
 	}
+	if *flagAddressEndpoint != "" {
+		raw.AddressServiceEndpoint = *flagAddressEndpoint
+	}
 
 	// Fallback to default port if not set anywhere
 	if raw.GRPCServicePort == "" {
 		raw.GRPCServicePort = defaultPort
+	}
+
+	// Fallback to default address service endpoint if not set
+	if raw.AddressServiceEndpoint == "" {
+		raw.AddressServiceEndpoint = "localhost:50066"
 	}
 
 	// If we still don't have a network ID or blockchain node endpoint, return an error
@@ -90,6 +101,7 @@ func NewConfig() (*Config, error) {
 		GRPCServicePort:        raw.GRPCServicePort,
 		NetworkID:              netID,
 		BlockchainNodeEndpoint: raw.BlockchainNodeEndpoint,
+		AddressServiceEndpoint: raw.AddressServiceEndpoint,
 	}, nil
 }
 

@@ -1,6 +1,7 @@
 go 1.25.5
 
 use (
+	./services/blockchain/address
 	./services/blockchain/networks/evm/protocol
 	./services/blockchain/shared/broadcaster
 	./services/blockchain/shared/indexer

@@ -9,9 +9,11 @@ import (
 
 	"github.com/p2p/blockchain/evm/protocol/v2/internal/domain"
 	"github.com/p2p/blockchain/evm/protocol/v2/internal/service"
+	"github.com/p2p/shared/pb/blockchain/address"
 	"github.com/p2p/shared/pb/blockchain/protocol"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -34,7 +36,15 @@ func main() {
 		logger.Fatal("failed to create blockchain client", zap.Error(err))
 	}
 
-	blockchainServer := service.NewBlockchainService(blockchainClient, *conf)
+	addressConn, err := grpc.NewClient(conf.AddressServiceEndpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		logger.Fatal("failed to connect to address service", zap.Error(err))
+	}
+	defer addressConn.Close()
+
+	addressClient := address.NewAddressServiceClient(addressConn)
+
+	blockchainServer := service.NewBlockchainService(blockchainClient, addressClient, *conf, logger)
 
 	lis, err := net.Listen("tcp", conf.GRPCServicePort)
 	if err != nil {
