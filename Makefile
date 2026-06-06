@@ -24,3 +24,19 @@ abi/gen:
 		--pkg=domain \
 		--type=Contract \
 		--out=services/blockchain/networks/evm/protocol/internal/domain/erc20.go
+
+.PHONY: build
+build:
+ifndef service
+	$(error service variable is required. Usage: make build service=[address|protocol])
+endif
+	@if [ "$(service)" = "address" ]; then \
+		echo "Building address service..."; \
+		docker build -t address-service -f services/blockchain/address/Dockerfile .; \
+	elif [ "$(service)" = "protocol" ]; then \
+		echo "Building protocol service..."; \
+		docker build -t protocol-service -f services/blockchain/networks/evm/protocol/Dockerfile .; \
+	else \
+		echo "Unknown service '$(service)'. Valid options are: address, protocol"; \
+		exit 1; \
+	fi

@@ -75,7 +75,7 @@ func NewConfig() (*Config, error) {
 
 	// Fallback to default address service endpoint if not set
 	if raw.AddressServiceEndpoint == "" {
-		raw.AddressServiceEndpoint = "localhost:50066"
+		raw.AddressServiceEndpoint = "localhost:50064"
 	}
 
 	// If we still don't have a network ID or blockchain node endpoint, return an error
