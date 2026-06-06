@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+// Package address defines the blockchain address service.
+package address;
+
+option go_package = "github.com/p2p/shared/pb/blockchain/address";
+
+message GetCustodyAddressesRequest {
+  repeated string addresses = 1;
+}
+
+message GetCustodyAddressesResponse {
+  repeated string addresses = 1;
+}
+
+service AddressService {
+  rpc GetCustodyAddresses(GetCustodyAddressesRequest) returns (GetCustodyAddressesResponse);
+}
+
+
