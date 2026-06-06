@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net"
 	"os"
@@ -13,19 +12,17 @@ import (
 	"github.com/p2p/shared/pb/blockchain/protocol"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
-	_, cancel := context.WithCancel(context.Background())
-	addShutdownHook(cancel)
-
-	log.Println("Blockchain service starting up...")
-
 	logger, err := zap.NewProduction()
 	if err != nil {
-		logger.Fatal("failed to initialize zap logger")
+		log.Fatalf("failed to initialize zap logger: %v", err)
 	}
 	defer logger.Sync()
+
+	logger.Info("Blockchain service starting up...")
 
 	conf, err := service.NewConfig()
 	if err != nil {
@@ -46,20 +43,27 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	protocol.RegisterProtocolServiceServer(grpcServer, blockchainServer)
-	if err = grpcServer.Serve(lis); err != nil {
-		logger.Fatal("failed to serve", zap.Error(err))
-	}
-	logger.Info("gRPC server started listening", zap.String("port", conf.GRPCServicePort))
-	defer grpcServer.GracefulStop()
-}
+	reflection.Register(grpcServer)
 
-func addShutdownHook(cancelFn context.CancelFunc) {
-	// Graceful shutdown
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	errChan := make(chan error, 1)
+
 	go func() {
-		sig := <-c
-		log.Printf("Received '%s' signal. Shutting down...\n", sig)
-		cancelFn()
+		logger.Info("gRPC server started listening", zap.String("port", conf.GRPCServicePort))
+		if err := grpcServer.Serve(lis); err != nil {
+			errChan <- err
+		}
 	}()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case err := <-errChan:
+		logger.Fatal("failed to serve gRPC server", zap.Error(err))
+	case sig := <-sigChan:
+		logger.Info("Received shutdown signal", zap.String("signal", sig.String()))
+		logger.Info("Stopping gRPC server gracefully...")
+		grpcServer.GracefulStop()
+		logger.Info("Shutdown complete.")
+	}
 }

@@ -1,6 +1,8 @@
 package service
 
 import (
+	"errors"
+	"flag"
 	"fmt"
 	"strconv"
 	"strings"
@@ -27,9 +29,56 @@ type rawConfig struct {
 }
 
 func NewConfig() (*Config, error) {
+	var (
+		flagPort     = flag.String("grpc-port", "", "gRPC service port")
+		flagNetwork  = flag.String("network-id", "", "Network ID")
+		flagEndpoint = flag.String("node-endpoint", "", "Blockchain node endpoint")
+	)
+
+	if !flag.Parsed() {
+		flag.Parse()
+	}
+
 	raw, err := LoadConfig[rawConfig]()
+	var configFileNotFound bool
 	if err != nil {
-		return nil, err
+		var configFileNotFoundErr viper.ConfigFileNotFoundError
+		if errors.As(err, &configFileNotFoundErr) {
+			configFileNotFound = true
+			raw = &rawConfig{}
+		} else {
+			return nil, fmt.Errorf("error reading config file: %w", err)
+		}
+	}
+
+	// Override with flags if they are set
+	if *flagPort != "" {
+		raw.GRPCServicePort = *flagPort
+	}
+	if *flagNetwork != "" {
+		raw.NetworkID = *flagNetwork
+	}
+	if *flagEndpoint != "" {
+		raw.BlockchainNodeEndpoint = *flagEndpoint
+	}
+
+	// Fallback to default port if not set anywhere
+	if raw.GRPCServicePort == "" {
+		raw.GRPCServicePort = defaultPort
+	}
+
+	// If we still don't have a network ID or blockchain node endpoint, return an error
+	if raw.NetworkID == "" {
+		if configFileNotFound {
+			return nil, fmt.Errorf("network ID must be provided via config file or -network-id flag")
+		}
+		return nil, fmt.Errorf("network ID is empty")
+	}
+	if raw.BlockchainNodeEndpoint == "" {
+		if configFileNotFound {
+			return nil, fmt.Errorf("blockchain node endpoint must be provided via config file or -node-endpoint flag")
+		}
+		return nil, fmt.Errorf("blockchain node endpoint is empty")
 	}
 
 	netID, err := parseNetworkID(raw.NetworkID)
@@ -74,7 +123,7 @@ func LoadConfig[T any]() (*T, error) {
 	v.AddConfigPath(".")
 
 	if err := v.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("error reading config file: %w", err)
+		return nil, err
 	}
 
 	var cfg T

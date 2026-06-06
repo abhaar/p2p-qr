@@ -1,0 +1,4 @@
+# EVM Protocol Service Configuration
+grpcserviceport: ":50065"
+network_id: "ETHEREUM"
+blockchain_node_endpoint: "https://eth-sepolia.g.alchemy.com/v2/jkuYmSa1fVcwA5V0OlvFtk1nwIV_WaqE"
