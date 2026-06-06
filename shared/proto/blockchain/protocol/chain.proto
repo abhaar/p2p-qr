@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+import "blockchain/network/network.proto";
+
+// Package protocol defines the blockchain sync/protocol APIs.
+package protocol;
+
+option go_package = "github.com/p2p/shared/pb/blockchain/protocol";
+
+message GetLatestBlockRequest {}
+
+message GetLatestBlockResponse {
+  string block_hash = 1;
+  uint64 block_height = 2;
+}
+
+message GetBlockEventsRequest {
+  uint64 block_height = 1;
+}
+
+message BlockchainEvent {
+  string idempotency_id = 1;
+  string block_hash = 3;
+  uint64 block_height = 4;
+  string tx_hash = 5;
+  string from = 6;
+  string to = 7;
+  string amount = 8;
+}
+
+message BlockchainEvents {
+  network.NetworkId network_id = 1;
+  repeated BlockchainEvent events = 2;
+}
+
+service ProtocolService {
+  rpc GetLatestBlock(GetLatestBlockRequest) returns (GetLatestBlockResponse);
+  rpc GetBlockEvents(GetBlockEventsRequest) returns (BlockchainEvents);
+}

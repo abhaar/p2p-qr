@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+// Package network defines blockchain network identifiers.
+package network;
+
+option go_package = "github.com/p2p/shared/pb/blockchain/network";
+
+enum NetworkId {
+  NETWORK_ID_UNSPECIFIED = 0;
+  NETWORK_ID_ETHEREUM = 1;
+}

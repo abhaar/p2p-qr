@@ -1,0 +1,10 @@
+go 1.25.5
+
+use (
+	./services/blockchain/networks/evm/protocol
+	./services/blockchain/shared/broadcaster
+	./services/blockchain/shared/indexer
+	./services/blockchain/shared/publisher
+	./services/custody
+	./shared
+)
