@@ -23,6 +23,21 @@ services:
     networks:
       - p2p-network
 
+  protocol-service:
+    build:
+      context: .
+      dockerfile: services/blockchain/indexer/Dockerfile
+    ports:
+      - "50066:50066"
+    command:
+      - "-protocol-service-endpoint=address-service:50065"
+      - "-network-id=ETHEREUM"
+    depends_on:
+      - protocol-service
+    networks:
+      - p2p-network
+
+
 networks:
   p2p-network:
     driver: bridge
