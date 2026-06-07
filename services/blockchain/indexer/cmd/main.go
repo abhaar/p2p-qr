@@ -42,9 +42,14 @@ func main() {
 
 	protocolClient := protocol.NewProtocolServiceClient(protocolConn)
 	repo := repository.NewInMemoryRepo(domain.BlockHeight(conf.StartingBlock))
-	producer := &publisher.NoopPublisher{}
 
-	indexer := service.New(logger, protocolClient, repo, producer)
+	pub, err := publisher.NewNatsPublisher(conf.NatsURL, conf.NatsSubject)
+	if err != nil {
+		logger.Fatal("failed to initialize NATS publisher", zap.Error(err))
+	}
+	defer pub.Close()
+
+	indexer := service.New(logger, protocolClient, repo, pub)
 	errChan := make(chan error, 1)
 
 	go func() {

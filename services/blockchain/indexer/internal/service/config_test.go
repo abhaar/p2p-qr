@@ -36,4 +36,10 @@ func TestNewConfig(t *testing.T) {
 	if cfg.StartingBlock != 12345 {
 		t.Errorf("expected StartingBlock 12345, got %d", cfg.StartingBlock)
 	}
+	if cfg.NatsURL != "nats://localhost:4222" {
+		t.Errorf("expected default NatsURL 'nats://localhost:4222', got '%s'", cfg.NatsURL)
+	}
+	if cfg.NatsSubject != "blockchain.events" {
+		t.Errorf("expected default NatsSubject 'blockchain.events', got '%s'", cfg.NatsSubject)
+	}
 }

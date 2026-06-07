@@ -24,6 +24,7 @@ func New(logger *zap.Logger, client protocol.ProtocolServiceClient, repo reposit
 		logger:         logger,
 		protocolClient: client,
 		repo:           repo,
+		publisher:      publisher,
 	}
 }
 

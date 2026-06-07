@@ -23,20 +23,30 @@ services:
     networks:
       - p2p-network
 
-  protocol-service:
+  nats:
+    image: nats:latest
+    container_name: nats-server
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: ["-m", "8222"]
+    networks:
+      - p2p-network
+
+  indexer-service:
     build:
       context: .
       dockerfile: services/blockchain/indexer/Dockerfile
     ports:
       - "50066:50066"
     command:
-      - "-protocol-service-endpoint=address-service:50065"
+      - "-protocol-service-endpoint=protocol-service:50065"
       - "-network-id=ETHEREUM"
     depends_on:
       - protocol-service
+      - nats
     networks:
       - p2p-network
-
 
 networks:
   p2p-network:

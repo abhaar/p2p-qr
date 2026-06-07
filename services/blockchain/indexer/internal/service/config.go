@@ -20,12 +20,16 @@ type Config struct {
 	NetworkID               network.NetworkId
 	ProtocolServiceEndpoint string
 	StartingBlock           uint64
+	NatsURL                 string
+	NatsSubject             string
 }
 
 type rawConfig struct {
 	NetworkID               string `mapstructure:"network_id"`
 	ProtocolServiceEndpoint string `mapstructure:"protocol_service_endpoint"`
 	StartingBlock           uint64 `mapstructure:"starting_block"`
+	NatsURL                 string `mapstructure:"nats_url"`
+	NatsSubject             string `mapstructure:"nats_subject"`
 }
 
 func NewConfig() (*Config, error) {
@@ -33,6 +37,8 @@ func NewConfig() (*Config, error) {
 		flagNetwork          = flag.String("network-id", "", "Network ID")
 		flagProtocolEndpoint = flag.String("protocol-service-endpoint", "", "Protocol service endpoint")
 		flagStartingBlock    = flag.Uint64("starting-block", 0, "Starting block height")
+		flagNatsURL          = flag.String("nats-url", "", "NATS URL")
+		flagNatsSubject      = flag.String("nats-subject", "", "NATS Subject")
 	)
 
 	if !flag.Parsed() {
@@ -40,9 +46,16 @@ func NewConfig() (*Config, error) {
 	}
 
 	var startingBlockSet bool
+	var natsURLSet bool
+	var natsSubjectSet bool
 	flag.Visit(func(f *flag.Flag) {
-		if f.Name == "starting-block" {
+		switch f.Name {
+		case "starting-block":
 			startingBlockSet = true
+		case "nats-url":
+			natsURLSet = true
+		case "nats-subject":
+			natsSubjectSet = true
 		}
 	})
 
@@ -68,6 +81,20 @@ func NewConfig() (*Config, error) {
 	if startingBlockSet {
 		raw.StartingBlock = *flagStartingBlock
 	}
+	if natsURLSet {
+		raw.NatsURL = *flagNatsURL
+	}
+	if natsSubjectSet {
+		raw.NatsSubject = *flagNatsSubject
+	}
+
+	// Apply defaults
+	if raw.NatsURL == "" {
+		raw.NatsURL = "nats://localhost:4222"
+	}
+	if raw.NatsSubject == "" {
+		raw.NatsSubject = "blockchain.events"
+	}
 
 	// If we still don't have a network ID or blockchain node endpoint, return an error
 	if raw.NetworkID == "" {
@@ -86,6 +113,8 @@ func NewConfig() (*Config, error) {
 		NetworkID:               netID,
 		ProtocolServiceEndpoint: raw.ProtocolServiceEndpoint,
 		StartingBlock:           raw.StartingBlock,
+		NatsURL:                 raw.NatsURL,
+		NatsSubject:             raw.NatsSubject,
 	}, nil
 }
 
