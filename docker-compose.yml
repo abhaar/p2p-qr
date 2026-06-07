@@ -16,7 +16,7 @@ services:
       - "50065:50065"
     command:
       - "-address-service-endpoint=address-service:50064"
-      - "-node-endpoint=https://eth-sepolia.g.alchemy.com/v2/jkuYmSa1fVcwA5V0OlvFtk1nwIV_WaqE"
+      - "-node-endpoint=http://anvil:8545"
       - "-network-id=ETHEREUM"
     depends_on:
       - address-service
@@ -29,7 +29,30 @@ services:
     ports:
       - "4222:4222"
       - "8222:8222"
-    command: ["-m", "8222"]
+    command: ["-m", "8222", "-js"]
+    networks:
+      - p2p-network
+
+  nui:
+    image: ghcr.io/nats-nui/nui:latest
+    container_name: nats-nui
+    ports:
+      - "31311:31311"
+    volumes:
+      - ./nui-db:/db
+      - ./shared/proto:/proto:ro
+      - ./nats-connections.json:/app/local-context.json:ro
+    command:
+      [
+        "--db-path",
+        "/db",
+        "--proto-schemas-path",
+        "/proto",
+        "--nats-cli-contexts",
+        "/app/local-context.json",
+      ]
+    depends_on:
+      - nats
     networks:
       - p2p-network
 
@@ -42,11 +65,50 @@ services:
     command:
       - "-protocol-service-endpoint=protocol-service:50065"
       - "-network-id=ETHEREUM"
+      - "-nats-url=nats://nats:4222"
     depends_on:
       - protocol-service
       - nats
     networks:
       - p2p-network
+
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: anvil-node
+    ports:
+      - "8545:8545"
+    entrypoint: ["anvil", "--host", "0.0.0.0", "--block-time", "1"]
+    networks:
+      - p2p-network
+
+  anvil-deploy:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: anvil-deployer
+    volumes:
+      - ./services/blockchain/networks/evm/protocol/internal/contracts:/contracts
+    working_dir: /contracts
+    depends_on:
+      - anvil
+    networks:
+      - p2p-network
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until cast block-number --rpc-url http://anvil:8545 >/dev/null 2>&1; do
+          echo "Waiting for Anvil node..."
+          sleep 1
+        done
+        echo "Anvil node is up, compiling and deploying USDC..."
+        mkdir -p /tmp/project/src
+        cp /contracts/usdc.sol /tmp/project/src/usdc.sol
+        cd /tmp/project
+        echo '[profile.default]' > foundry.toml
+        forge create src/usdc.sol:USDC \
+          --rpc-url http://anvil:8545 \
+          --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+          --broadcast \
+          --constructor-args 1000000000000
 
 networks:
   p2p-network:

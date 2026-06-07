@@ -6,6 +6,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/p2p/shared/pb/blockchain/protocol"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -26,10 +27,12 @@ func NewNatsPublisher(url string, subject string) (*NatsPublisher, error) {
 	}, nil
 }
 
-func (p *NatsPublisher) Publish(ctx context.Context, events *protocol.BlockchainEvents) error {
+func (p *NatsPublisher) Publish(ctx context.Context, logger *zap.Logger, events *protocol.BlockchainEvents) error {
 	if len(events.GetEvents()) == 0 {
 		return nil
 	}
+
+	logger.Info("publishing blockchain events", zap.Uint64("block", events.GetBlockHeight()), zap.Int("event_count", len(events.GetEvents())))
 
 	data, err := proto.Marshal(events)
 	if err != nil {

@@ -6,6 +6,7 @@ import "context"
 var custodyAddresses = map[string]struct{}{
 	"0x0578E5EA652C62DB20F4475F685A4b587314A30f": {},
 	"0xA3E36262f6899e27bB4B1802e8298e843E74CBC7": {},
+	"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266": {},
 }
 
 type InMemoryRepository struct{}

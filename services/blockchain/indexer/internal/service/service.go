@@ -47,23 +47,25 @@ func (s *Indexer) Run(ctx context.Context) error {
 				return err
 			}
 
-			for i := lasIndexedBlock; i <= tip; i++ {
-				blockHeightUint64 := uint64(i)
-				events, err := s.protocolClient.GetBlockEvents(ctx, &protocol.GetBlockEventsRequest{BlockHeight: blockHeightUint64})
-				if err != nil {
-					s.logger.Error("failed to get events for block", zap.Uint64("height", blockHeightUint64), zap.Error(err))
-					return err
-				}
+			if lasIndexedBlock < tip {
+				for i := lasIndexedBlock + 1; i <= tip; i++ {
+					blockHeightUint64 := uint64(i)
+					events, err := s.protocolClient.GetBlockEvents(ctx, &protocol.GetBlockEventsRequest{BlockHeight: blockHeightUint64})
+					if err != nil {
+						s.logger.Error("failed to get events for block", zap.Uint64("height", blockHeightUint64), zap.Error(err))
+						return err
+					}
 
-				err = s.publisher.Publish(ctx, events)
-				if err != nil {
-					s.logger.Error("failed to publish events for block", zap.Uint64("height", blockHeightUint64), zap.Error(err))
-					return err
-				}
+					err = s.publisher.Publish(ctx, s.logger, events)
+					if err != nil {
+						s.logger.Error("failed to publish events for block", zap.Uint64("height", blockHeightUint64), zap.Error(err))
+						return err
+					}
 
-				err = s.repo.SetLastIndexedBlock(i)
-				if err != nil {
-					s.logger.Error("failed to update scanning progress", zap.Uint64("block", blockHeightUint64))
+					err = s.repo.SetLastIndexedBlock(i)
+					if err != nil {
+						s.logger.Error("failed to update scanning progress", zap.Uint64("block", blockHeightUint64))
+					}
 				}
 			}
 		}
@@ -79,7 +81,7 @@ func (s *Indexer) getLastIndexedBlock(ctx context.Context) (domain.BlockHeight, 
 			return domain.BlockHeight(0), err
 		}
 
-		_ = s.repo.SetLastIndexedBlock(lasIndexedBlock)
+		_ = s.repo.SetLastIndexedBlock(tip)
 
 		return tip, nil
 	}

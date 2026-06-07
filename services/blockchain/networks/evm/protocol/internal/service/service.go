@@ -65,7 +65,16 @@ func (s *BlockchainService) GetBlockEvents(ctx context.Context, req *protocol.Ge
 	}
 
 	if len(receipts) == 0 {
-		return nil, fmt.Errorf("receipts not found for block: %d", req.GetBlockHeight())
+		header, err := s.getHeaderByNumber(ctx, blockHeightHexStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get block header for empty block %d: %w", req.GetBlockHeight(), err)
+		}
+		return &protocol.BlockchainEvents{
+			BlockHash:   header.Hash().String(),
+			BlockHeight: req.GetBlockHeight(),
+			NetworkId:   s.cfg.NetworkID,
+			Events:      nil,
+		}, nil
 	}
 	blockHash := receipts[0].BlockHash.String()
 	blockNumber := receipts[0].BlockNumber.Uint64()

@@ -1,0 +1,5 @@
+{
+  "description": "Auto-generated Local Dev Stack Connection",
+  "url": "nats://nats:4222",
+  "monitoring_url": "http://nats:8222"
+}

@@ -5,8 +5,9 @@ import (
 	"context"
 
 	"github.com/p2p/shared/pb/blockchain/protocol"
+	"go.uber.org/zap"
 )
 
 type EventPublisher interface {
-	Publish(ctx context.Context, events *protocol.BlockchainEvents) error
+	Publish(ctx context.Context, logger *zap.Logger, events *protocol.BlockchainEvents) error
 }
