@@ -5,7 +5,8 @@ use (
 	./services/blockchain/networks/evm/protocol
 	./services/blockchain/broadcaster
 	./services/blockchain/indexer
-	./services/blockchain/publisher
+	./services/blockchain/signer
 	./services/custody
 	./shared
 )
+
