@@ -10,9 +10,11 @@ package protocol
 
 import (
 	context "context"
+	signer "github.com/p2p/shared/pb/blockchain/signer"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -21,8 +23,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ProtocolService_GetLatestBlock_FullMethodName = "/protocol.ProtocolService/GetLatestBlock"
-	ProtocolService_GetBlockEvents_FullMethodName = "/protocol.ProtocolService/GetBlockEvents"
+	ProtocolService_GetLatestBlock_FullMethodName     = "/protocol.ProtocolService/GetLatestBlock"
+	ProtocolService_GetBlockEvents_FullMethodName     = "/protocol.ProtocolService/GetBlockEvents"
+	ProtocolService_PrepareTransaction_FullMethodName = "/protocol.ProtocolService/PrepareTransaction"
+	ProtocolService_Transfer_FullMethodName           = "/protocol.ProtocolService/Transfer"
 )
 
 // ProtocolServiceClient is the client API for ProtocolService service.
@@ -31,6 +35,8 @@ const (
 type ProtocolServiceClient interface {
 	GetLatestBlock(ctx context.Context, in *GetLatestBlockRequest, opts ...grpc.CallOption) (*GetLatestBlockResponse, error)
 	GetBlockEvents(ctx context.Context, in *GetBlockEventsRequest, opts ...grpc.CallOption) (*BlockchainEvents, error)
+	PrepareTransaction(ctx context.Context, in *anypb.Any, opts ...grpc.CallOption) (*signer.UnsignedEvmTransaction, error)
+	Transfer(ctx context.Context, in *signer.SignedTransaction, opts ...grpc.CallOption) (*TransferResponse, error)
 }
 
 type protocolServiceClient struct {
@@ -61,12 +67,34 @@ func (c *protocolServiceClient) GetBlockEvents(ctx context.Context, in *GetBlock
 	return out, nil
 }
 
+func (c *protocolServiceClient) PrepareTransaction(ctx context.Context, in *anypb.Any, opts ...grpc.CallOption) (*signer.UnsignedEvmTransaction, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(signer.UnsignedEvmTransaction)
+	err := c.cc.Invoke(ctx, ProtocolService_PrepareTransaction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *protocolServiceClient) Transfer(ctx context.Context, in *signer.SignedTransaction, opts ...grpc.CallOption) (*TransferResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TransferResponse)
+	err := c.cc.Invoke(ctx, ProtocolService_Transfer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProtocolServiceServer is the server API for ProtocolService service.
 // All implementations must embed UnimplementedProtocolServiceServer
 // for forward compatibility.
 type ProtocolServiceServer interface {
 	GetLatestBlock(context.Context, *GetLatestBlockRequest) (*GetLatestBlockResponse, error)
 	GetBlockEvents(context.Context, *GetBlockEventsRequest) (*BlockchainEvents, error)
+	PrepareTransaction(context.Context, *anypb.Any) (*signer.UnsignedEvmTransaction, error)
+	Transfer(context.Context, *signer.SignedTransaction) (*TransferResponse, error)
 	mustEmbedUnimplementedProtocolServiceServer()
 }
 
@@ -82,6 +110,12 @@ func (UnimplementedProtocolServiceServer) GetLatestBlock(context.Context, *GetLa
 }
 func (UnimplementedProtocolServiceServer) GetBlockEvents(context.Context, *GetBlockEventsRequest) (*BlockchainEvents, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlockEvents not implemented")
+}
+func (UnimplementedProtocolServiceServer) PrepareTransaction(context.Context, *anypb.Any) (*signer.UnsignedEvmTransaction, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PrepareTransaction not implemented")
+}
+func (UnimplementedProtocolServiceServer) Transfer(context.Context, *signer.SignedTransaction) (*TransferResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Transfer not implemented")
 }
 func (UnimplementedProtocolServiceServer) mustEmbedUnimplementedProtocolServiceServer() {}
 func (UnimplementedProtocolServiceServer) testEmbeddedByValue()                         {}
@@ -140,6 +174,42 @@ func _ProtocolService_GetBlockEvents_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProtocolService_PrepareTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(anypb.Any)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProtocolServiceServer).PrepareTransaction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProtocolService_PrepareTransaction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProtocolServiceServer).PrepareTransaction(ctx, req.(*anypb.Any))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProtocolService_Transfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(signer.SignedTransaction)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProtocolServiceServer).Transfer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProtocolService_Transfer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProtocolServiceServer).Transfer(ctx, req.(*signer.SignedTransaction))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProtocolService_ServiceDesc is the grpc.ServiceDesc for ProtocolService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -154,6 +224,14 @@ var ProtocolService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetBlockEvents",
 			Handler:    _ProtocolService_GetBlockEvents_Handler,
+		},
+		{
+			MethodName: "PrepareTransaction",
+			Handler:    _ProtocolService_PrepareTransaction_Handler,
+		},
+		{
+			MethodName: "Transfer",
+			Handler:    _ProtocolService_Transfer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

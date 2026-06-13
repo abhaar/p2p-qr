@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+import "blockchain/network/network.proto";
+import "google/protobuf/any.proto";
+
+// Package broadcaster defines the blockchain transfer APIs.
+package broadcaster;
+
+option go_package = "github.com/p2p/shared/pb/blockchain/broadcaster";
+
+message EVMTransactionIntent {
+  enum IntentType {
+    INTENT_TYPE_UNSPECIFIED = 0;
+    INTENT_TYPE_ERC20_TRANSFER = 1;
+  }
+
+  IntentType intentType = 1;
+
+  oneof intent {
+    ERC20TransferIntent erc20TransferIntent = 2;
+  }
+}
+
+message ERC20TransferIntent {
+  string from = 1;
+  string to = 2;
+  string contractAddress = 3;
+  bytes amount = 4;
+  bytes maxFeePerGas = 5;
+}
+
+message TransactionIntentRequest {
+  enum IntentType {
+    INTENT_TYPE_UNSPECIFIED = 0;
+    INTENT_TYPE_TRANSFER = 1;
+  }
+
+  network.NetworkId networkId = 1;
+  IntentType intentType = 2;
+  google.protobuf.Any intentPayload = 3;
+}
+
+message TransactionIntentResponse {
+  enum Status {
+    STATUS_UNKNOWN = 0;
+    STATUS_INVALID_REQUEST = 1;
+    STATUS_SIGNING_FAILED = 2;
+    STATUS_BROADCASTED = 3;
+    STATUS_BROADCAST_FAILED = 4;
+  }
+
+  Status status = 1;
+  string transaction_id = 2;
+  string errorMessage = 3;
+}
+
+service BroadcastService {
+  rpc SendTransaction(TransactionIntentRequest) returns (TransactionIntentResponse);
+}

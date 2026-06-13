@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+import "blockchain/network/network.proto";
+
+// Package broadcaster defines the blockchain transfer APIs.
+package signer;
+
+option go_package = "github.com/p2p/shared/pb/blockchain/signer";
+
+message UnsignedEvmTransaction {
+  network.NetworkId networkId = 1;
+  string from = 2;
+  uint64 nonce = 3;
+  string to = 4;
+  bytes maxPriorityFeePerGas = 5; 
+  bytes maxFeePerGas = 6; 
+  uint64 gasLimit = 7;
+  bytes data = 8;
+}
+
+message UnsignedTransactionRequest {
+  network.NetworkId networkId = 1;
+  oneof request {
+    UnsignedEvmTransaction evm = 2;
+  }
+}
+
+message SignedTransaction {
+  bytes data = 1;
+}
+
+service SigningService {
+  rpc SignTransaction(UnsignedTransactionRequest) returns (SignedTransaction);
+}
+

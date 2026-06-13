@@ -1,6 +1,8 @@
 syntax = "proto3";
 
 import "blockchain/network/network.proto";
+import "blockchain/signer/signer.proto";
+import "google/protobuf/any.proto";
 
 // Package protocol defines the blockchain sync/protocol APIs.
 package protocol;
@@ -34,7 +36,21 @@ message BlockchainEvents {
   repeated BlockchainEvent events = 4;
 }
 
+message TransferResponse {
+  enum Status {
+    TRANSFER_RESPONSE_UNKNOWN = 0;
+    TRANSFER_RESPONSE_BROADCASTED = 1;
+    TRANSFER_RESPONSE_FAILED = 2;
+  }
+
+  Status status = 1;
+  string tx_hash = 2;
+  string error = 3;
+}
+
 service ProtocolService {
   rpc GetLatestBlock(GetLatestBlockRequest) returns (GetLatestBlockResponse);
   rpc GetBlockEvents(GetBlockEventsRequest) returns (BlockchainEvents);
+  rpc PrepareTransaction(google.protobuf.Any) returns (signer.UnsignedEvmTransaction);
+  rpc Transfer(signer.SignedTransaction) returns (TransferResponse);
 }
