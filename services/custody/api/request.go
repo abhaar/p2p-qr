@@ -9,6 +9,12 @@ type TransferRequest struct {
 	Currency string `json:"currency"`
 }
 
+// TransferFromQRRequest is the JSON body accepted by POST /transfer/qr.
+type TransferFromQRRequest struct {
+	Payload string `json:"payload"`
+	From    string `json:"from"`
+}
+
 // X9APaymentRequest is the data structure for generating a payment request QR code and encoded payload.
 type X9APaymentRequest struct {
 	Address  string `json:"address"`

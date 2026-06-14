@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,6 +10,8 @@ import (
 	"testing"
 
 	"go.uber.org/zap"
+
+	"github.com/p2p/custody/v2/internal/domain"
 )
 
 func TestParseDecimalAmount(t *testing.T) {
@@ -166,6 +169,100 @@ func TestHandleGeneratePaymentQR(t *testing.T) {
 		req := httptest.NewRequest("POST", "/payment-request/qr", strings.NewReader(`{invalid`))
 		w := httptest.NewRecorder()
 		server.handleGeneratePaymentQR(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("expected status BadRequest, got %v", resp.Status)
+		}
+	})
+}
+
+type MockCustodyService struct {
+	TransferFunc func(ctx context.Context, intent domain.TransferIntent) (*domain.TransferResult, error)
+}
+
+func (m *MockCustodyService) GetBalance(ctx context.Context, address, currency string) (domain.Balance, error) {
+	return domain.Balance{}, nil
+}
+
+func (m *MockCustodyService) Transfer(ctx context.Context, intent domain.TransferIntent) (*domain.TransferResult, error) {
+	if m.TransferFunc != nil {
+		return m.TransferFunc(ctx, intent)
+	}
+	return &domain.TransferResult{TxHash: "0xMockHash", Status: "broadcasted"}, nil
+}
+
+func TestHandleTransferFromQR(t *testing.T) {
+	logger := zap.NewNop()
+
+	t.Run("valid transfer request from QR", func(t *testing.T) {
+		// Mock service to verify parameters passed to it
+		var capturedIntent domain.TransferIntent
+		mockService := &MockCustodyService{
+			TransferFunc: func(ctx context.Context, intent domain.TransferIntent) (*domain.TransferResult, error) {
+				capturedIntent = intent
+				return &domain.TransferResult{TxHash: "0xTestTxHash", Status: "broadcasted"}, nil
+			},
+		}
+		server := NewServer(logger, mockService)
+
+		// Create a valid EMVCo QR code payload using the generator helper
+		validPayload, err := buildEMVCoQRContent(X9APaymentRequest{
+			Address:  "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+			Amount:   "10.50",
+			Currency: "USDC",
+			Network:  "ethereum",
+			Memo:     "invoice-789",
+		})
+		if err != nil {
+			t.Fatalf("failed to build test QR content: %v", err)
+		}
+
+		body := `{"payload":"` + validPayload + `","from":"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"}`
+		req := httptest.NewRequest("POST", "/transfer/qr", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		server.handleTransferFromQR(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status OK, got %v", resp.Status)
+		}
+
+		// Verify fields extracted from QR code were transformed correctly
+		if capturedIntent.From != "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" {
+			t.Errorf("expected from 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266, got %s", capturedIntent.From)
+		}
+		if capturedIntent.To != "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" {
+			t.Errorf("expected to 0x70997970C51812dc3A010C7d01b50e0d17dc79C8, got %s", capturedIntent.To)
+		}
+		// 10.50 * 1000000 = 10500000
+		if capturedIntent.Amount != "10500000" {
+			t.Errorf("expected amount 10500000, got %s", capturedIntent.Amount)
+		}
+		if capturedIntent.Currency != "USDC" {
+			t.Errorf("expected currency USDC, got %s", capturedIntent.Currency)
+		}
+	})
+
+	t.Run("invalid from address", func(t *testing.T) {
+		server := NewServer(logger, &MockCustodyService{})
+		body := `{"payload":"some-payload","from":"invalid-address"}`
+		req := httptest.NewRequest("POST", "/transfer/qr", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		server.handleTransferFromQR(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("expected status BadRequest, got %v", resp.Status)
+		}
+	})
+
+	t.Run("invalid QR payload format", func(t *testing.T) {
+		server := NewServer(logger, &MockCustodyService{})
+		body := `{"payload":"invalid-payload-without-crc-format","from":"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"}`
+		req := httptest.NewRequest("POST", "/transfer/qr", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		server.handleTransferFromQR(w, req)
 
 		resp := w.Result()
 		if resp.StatusCode != http.StatusBadRequest {
