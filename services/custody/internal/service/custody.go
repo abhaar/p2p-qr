@@ -13,34 +13,36 @@ import (
 	"github.com/p2p/custody/v2/internal/repository"
 )
 
-var custodyAddresses = []string{
-	"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-	"0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-}
-
 // defaultUsdcContractAddress is the USDC contract address deployed on local Anvil by default.
 const defaultUsdcContractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
 
 // CustodyService is the concrete implementation of domain.CustodyService.
 type CustodyService struct {
-	logger      *zap.Logger
-	broadcaster domain.Broadcaster
-	repo        domain.Repository
+	logger         *zap.Logger
+	broadcaster    domain.Broadcaster
+	addressService domain.AddressService
+	repo           domain.Repository
 }
 
 // NewCustodyService creates a new CustodyService.
-func NewCustodyService(logger *zap.Logger, broadcaster domain.Broadcaster) *CustodyService {
+func NewCustodyService(logger *zap.Logger, broadcaster domain.Broadcaster, addressService domain.AddressService) *CustodyService {
 	repo := repository.NewInMemoryRepository(logger)
 	service := &CustodyService{
-		logger:      logger,
-		broadcaster: broadcaster,
-		repo:        repo,
+		logger:         logger,
+		broadcaster:    broadcaster,
+		addressService: addressService,
+		repo:           repo,
+	}
+
+	custodyAddresses, err := addressService.GetCustodyAddresses(context.Background(), nil)
+	if err != nil {
+		logger.Fatal("failed to fetch custody addresses from address service", zap.Error(err))
 	}
 
 	for _, addr := range custodyAddresses {
 		balance, err := service.getBalance(context.Background(), addr, "USDC")
 		if err != nil {
-			logger.Fatal("failed to initialize wallet balance", zap.String("address", addr))
+			logger.Fatal("failed to initialize wallet balance", zap.String("address", addr), zap.Error(err))
 		}
 
 		balanceBigInt, ok := new(big.Int).SetString(balance, 10)
@@ -50,7 +52,7 @@ func NewCustodyService(logger *zap.Logger, broadcaster domain.Broadcaster) *Cust
 
 		err = service.repo.UpdateBalance(balanceBigInt, addr, "USDC")
 		if err != nil {
-			logger.Fatal("failed to store initial balance", zap.String("address", addr), zap.String("balance", balance))
+			logger.Fatal("failed to store initial balance", zap.String("address", addr), zap.String("balance", balance), zap.Error(err))
 		}
 	}
 
@@ -84,7 +86,7 @@ func (s *CustodyService) GetBalance(ctx context.Context, address, currency strin
 	return domain.Balance{
 		Address:  address,
 		Currency: currency,
-		Amount:   decimals.String(),
+		Amount:   normalizedAmount.String(),
 	}, nil
 }
 
@@ -131,4 +133,9 @@ func (s *CustodyService) getBalance(ctx context.Context, address, currency strin
 	}
 
 	return amount, nil
+}
+
+// Repo returns the underlying balance repository.
+func (s *CustodyService) Repo() domain.Repository {
+	return s.repo
 }

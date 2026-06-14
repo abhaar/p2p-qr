@@ -23,3 +23,8 @@ type Broadcaster interface {
 	// returns the resulting transaction hash and status.
 	SendTransfer(ctx context.Context, intent TransferIntent) (*TransferResult, error)
 }
+
+// AddressService abstracts the blockchain address service.
+type AddressService interface {
+	GetCustodyAddresses(ctx context.Context, addresses []string) ([]string, error)
+}

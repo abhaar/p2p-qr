@@ -23,7 +23,6 @@ func (s *Server) handleGetBalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	address = strings.ToLower(address)
 	if !evmAddressRegex.MatchString(address) {
 		s.writeError(w, http.StatusBadRequest, "invalid EVM address")
 		return
@@ -57,13 +56,11 @@ func (s *Server) handleTransfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req.From = strings.ToLower(req.From)
-	req.To = strings.ToLower(req.To)
-
 	if !evmAddressRegex.MatchString(req.From) {
 		s.writeError(w, http.StatusBadRequest, "invalid 'from' EVM address")
 		return
 	}
+
 	if !evmAddressRegex.MatchString(req.To) {
 		s.writeError(w, http.StatusBadRequest, "invalid 'to' EVM address")
 		return
@@ -91,8 +88,6 @@ func (s *Server) handleTransfer(w http.ResponseWriter, r *http.Request) {
 		Status: result.Status,
 	})
 }
-
-// --- Helpers ---
 
 // writeJSON marshals v as JSON and writes it to w with the given status code.
 func (s *Server) writeJSON(w http.ResponseWriter, status int, v any) {

@@ -125,19 +125,26 @@ func (s *BlockchainService) PrepareTransaction(ctx context.Context, in *anypb.An
 		return nil, fmt.Errorf("prepare transaction request must not be empty")
 	}
 
-	if !in.MessageIs((*broadcaster.ERC20TransferIntent)(nil)) {
+	if !in.MessageIs((*broadcaster.EVMTransactionIntent)(nil)) {
 		s.logger.Error("invalid transaction type received for prepare transaction", zap.String("type", in.GetTypeUrl()))
 		return nil, fmt.Errorf("invalid transaction type received: %s", in.GetTypeUrl())
 	}
 
-	erc20TransferIntent := &broadcaster.ERC20TransferIntent{}
-	err := anypb.UnmarshalTo(in, erc20TransferIntent, proto.UnmarshalOptions{})
+	evmTransactionIntent := &broadcaster.EVMTransactionIntent{}
+	err := anypb.UnmarshalTo(in, evmTransactionIntent, proto.UnmarshalOptions{})
 	if err != nil {
-		s.logger.Error("failed to unmarshal intent into ERC20TransferIntent", zap.Error(err))
+		s.logger.Error("failed to unmarshal intent into EVMTransactionIntent", zap.Error(err))
 		return nil, fmt.Errorf("invalid transaction type received: %s", in.GetTypeUrl())
 	}
 
+	if evmTransactionIntent.GetIntentType() != broadcaster.EVMTransactionIntent_INTENT_TYPE_ERC20_TRANSFER {
+		s.logger.Error("invalid transfer intent. expected ERC-20 transfer", zap.Stringer("intent type", evmTransactionIntent.GetIntentType()))
+	}
+
 	s.logger.Info("request to validate erc-20 transfer received")
+
+	erc20TransferIntent := evmTransactionIntent.GetErc20TransferIntent()
+
 	if err := s.validateErc20TransferRequest(ctx, erc20TransferIntent); err != nil {
 		return nil, err
 	}
