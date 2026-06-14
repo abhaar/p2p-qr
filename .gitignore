@@ -1,1 +1,4 @@
 nui-db
+*.html
+*.png
+*DS_store

@@ -30,4 +30,6 @@ func NewServer(logger *zap.Logger, custody domain.CustodyService) *Server {
 func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /balance/{address}", s.handleGetBalance)
 	mux.HandleFunc("POST /transfer", s.handleTransfer)
+	mux.HandleFunc("GET /payment-request/qr", s.handleGeneratePaymentQR)
+	mux.HandleFunc("POST /payment-request/qr", s.handleGeneratePaymentQR)
 }

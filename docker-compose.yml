@@ -99,6 +99,8 @@ services:
       - USDC_CONTRACT_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
       - NATS_URL=nats://nats:4222
       - NATS_SUBJECT=blockchain.events
+    volumes:
+      - ./services/custody/qrcodes:/app/qrcodes
     depends_on:
       - broadcaster-service
       - address-service
