@@ -6,7 +6,7 @@ import "context"
 // The API layer depends on this interface, not on a concrete implementation.
 type CustodyService interface {
 	// GetBalance returns the token balance for the given address and currency.
-	GetBalance(ctx context.Context, address, currency string) (*Balance, error)
+	GetBalance(ctx context.Context, address, currency string) (Balance, error)
 
 	// Transfer executes a token transfer described by the given intent.
 	Transfer(ctx context.Context, intent TransferIntent) (*TransferResult, error)
