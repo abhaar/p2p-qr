@@ -44,7 +44,7 @@ func main() {
 
 	addressClient := address.NewAddressServiceClient(addressConn)
 
-	blockchainServer := service.NewBlockchainService(blockchainClient, addressClient, *conf, logger)
+	blockchainServer := service.NewBlockchainService(blockchainClient, addressClient, conf.NetworkID, logger)
 
 	lis, err := net.Listen("tcp", conf.GRPCServicePort)
 	if err != nil {

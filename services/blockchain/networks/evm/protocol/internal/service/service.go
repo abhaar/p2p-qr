@@ -4,29 +4,38 @@ package service
 import (
 	"context"
 	"fmt"
+	"math/big"
+	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/p2p/blockchain/evm/protocol/v2/internal/domain"
 	"github.com/p2p/shared/pb/blockchain/address"
+	"github.com/p2p/shared/pb/blockchain/broadcaster"
+	network "github.com/p2p/shared/pb/blockchain/network"
 	"github.com/p2p/shared/pb/blockchain/protocol"
+	"github.com/p2p/shared/pb/blockchain/signer"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // BlockchainService implements the protocol.ProtocolServiceServer interface for EVM networks.
 type BlockchainService struct {
 	protocol.UnimplementedProtocolServiceServer
 	logger               *zap.Logger
-	cfg                  Config
+	networkID            network.NetworkId
 	evmClient            domain.EVMClient
 	addressServiceClient address.AddressServiceClient
 }
 
 // NewBlockchainService creates a new BlockchainService instance.
-func NewBlockchainService(client domain.EVMClient, addressServiceClient address.AddressServiceClient, cfg Config, logger *zap.Logger) *BlockchainService {
+func NewBlockchainService(client domain.EVMClient, addressServiceClient address.AddressServiceClient, networkId network.NetworkId, logger *zap.Logger) *BlockchainService {
 	return &BlockchainService{
 		logger:               logger,
-		cfg:                  cfg,
+		networkID:            networkId,
 		evmClient:            client,
 		addressServiceClient: addressServiceClient,
 	}
@@ -72,7 +81,7 @@ func (s *BlockchainService) GetBlockEvents(ctx context.Context, req *protocol.Ge
 		return &protocol.BlockchainEvents{
 			BlockHash:   header.Hash().String(),
 			BlockHeight: req.GetBlockHeight(),
-			NetworkId:   s.cfg.NetworkID,
+			NetworkId:   s.networkID,
 			Events:      nil,
 		}, nil
 	}
@@ -106,8 +115,130 @@ func (s *BlockchainService) GetBlockEvents(ctx context.Context, req *protocol.Ge
 	return &protocol.BlockchainEvents{
 		BlockHash:   blockHash,
 		BlockHeight: blockNumber,
-		NetworkId:   s.cfg.NetworkID,
+		NetworkId:   s.networkID,
 		Events:      relevantEvents,
+	}, nil
+}
+
+func (s *BlockchainService) PrepareTransaction(ctx context.Context, in *anypb.Any) (*signer.UnsignedEvmTransaction, error) {
+	if in == nil {
+		return nil, fmt.Errorf("prepare transaction request must not be empty")
+	}
+
+	if !in.MessageIs((*broadcaster.EVMTransactionIntent)(nil)) {
+		s.logger.Error("invalid transaction type received for prepare transaction", zap.String("type", in.GetTypeUrl()))
+		return nil, fmt.Errorf("invalid transaction type received: %s", in.GetTypeUrl())
+	}
+
+	intent := &broadcaster.EVMTransactionIntent{}
+	err := anypb.UnmarshalTo(in, intent, proto.UnmarshalOptions{})
+	if err != nil {
+		s.logger.Error("failed to unmarshal intent into EVMTransactionIntent", zap.Error(err))
+		return nil, fmt.Errorf("invalid transaction type received: %s", in.GetTypeUrl())
+	}
+
+	switch intent.GetIntentType() {
+	case broadcaster.EVMTransactionIntent_INTENT_TYPE_ERC20_TRANSFER:
+		s.logger.Info("request to validate erc-20 transfer received")
+		if err := s.validateErc20TransferRequest(ctx, intent.GetErc20TransferIntent()); err != nil {
+			return nil, err
+		}
+
+		erc20TransferIntent := intent.GetErc20TransferIntent()
+		if !common.IsHexAddress(erc20TransferIntent.GetFrom()) {
+			return nil, fmt.Errorf("invalid from address: %s", erc20TransferIntent.GetFrom())
+		}
+		if !common.IsHexAddress(erc20TransferIntent.GetTo()) {
+			return nil, fmt.Errorf("invalid to address: %s", erc20TransferIntent.GetTo())
+		}
+		if !common.IsHexAddress(erc20TransferIntent.GetContractAddress()) {
+			return nil, fmt.Errorf("invalid contract address: %s", erc20TransferIntent.GetContractAddress())
+		}
+		if len(erc20TransferIntent.GetAmount()) == 0 {
+			return nil, fmt.Errorf("amount must not be empty")
+		}
+
+		from := common.HexToAddress(erc20TransferIntent.GetFrom())
+		to := common.HexToAddress(erc20TransferIntent.GetContractAddress())
+		recipient := common.HexToAddress(erc20TransferIntent.GetTo())
+		amount := new(big.Int).SetBytes(erc20TransferIntent.GetAmount())
+
+		contractAbi, err := abi.JSON(strings.NewReader(domain.ContractABI))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse contract ABI: %w", err)
+		}
+
+		data, err := contractAbi.Pack("transfer", recipient, amount)
+		if err != nil {
+			return nil, fmt.Errorf("failed to pack transfer input: %w", err)
+		}
+
+		nonce, err := s.getNonce(ctx, from)
+		if err != nil {
+			s.logger.Error("failed to get nonce", zap.Error(err))
+			return nil, err
+		}
+
+		gasLimit, err := s.getGasLimit(ctx, from, to, data)
+		if err != nil {
+			s.logger.Error("failed to calculate gas limit", zap.Error(err))
+			return nil, err
+		}
+
+		maxFeePerGas, maxPriorityFeePerGas, err := s.getFees(ctx)
+		if err != nil {
+			s.logger.Error("failed to calculate fees", zap.Error(err))
+			return nil, err
+		}
+
+		return &signer.UnsignedEvmTransaction{
+			NetworkId:            s.networkID,
+			From:                 from.Hex(),
+			Nonce:                nonce,
+			To:                   to.Hex(),
+			GasLimit:             gasLimit,
+			MaxPriorityFeePerGas: maxPriorityFeePerGas.Bytes(),
+			MaxFeePerGas:         maxFeePerGas.Bytes(),
+			Data:                 data,
+		}, nil
+
+	default:
+		s.logger.Error("request to valdiate invalid evm intent type received", zap.Stringer("type", intent.GetIntentType()))
+		return nil, fmt.Errorf("request to valdiate invalid evm intent type received")
+	}
+}
+
+func (s *BlockchainService) Transfer(ctx context.Context, req *signer.SignedTransaction) (*protocol.TransferResponse, error) {
+	if req == nil {
+		return nil, fmt.Errorf("request cannot be nil")
+	}
+
+	var tx types.Transaction
+	if err := tx.UnmarshalBinary(req.GetData()); err != nil {
+		s.logger.Error("failed to unmarshal signed transaction data", zap.Error(err))
+		return &protocol.TransferResponse{
+			Status: protocol.TransferResponse_TRANSFER_RESPONSE_FAILED,
+			Error:  fmt.Sprintf("invalid signed transaction: %s", err.Error()),
+		}, nil
+	}
+
+	txHash := tx.Hash().Hex()
+
+	var txHashStr string
+	err := s.evmClient.RPCClient().CallContext(ctx, &txHashStr, "eth_sendRawTransaction", hexutil.Encode(req.GetData()))
+	if err != nil {
+		s.logger.Error("failed to broadcast transaction", zap.String("tx_hash", txHash), zap.Error(err))
+		return &protocol.TransferResponse{
+			Status: protocol.TransferResponse_TRANSFER_RESPONSE_FAILED,
+			TxHash: txHash,
+			Error:  err.Error(),
+		}, nil
+	}
+
+	s.logger.Info("transaction broadcasted successfully", zap.String("tx_hash", txHashStr))
+	return &protocol.TransferResponse{
+		Status: protocol.TransferResponse_TRANSFER_RESPONSE_BROADCASTED,
+		TxHash: txHashStr,
 	}, nil
 }
 
@@ -167,4 +298,113 @@ func (s *BlockchainService) filterRelevantEvents(ctx context.Context, events []*
 	)
 
 	return filteredEvents, nil
+}
+
+func (s *BlockchainService) validateErc20TransferRequest(ctx context.Context, req *broadcaster.ERC20TransferIntent) error {
+	if req == nil {
+		return fmt.Errorf("request must not be nil")
+	}
+
+	if !common.IsHexAddress(req.GetFrom()) {
+		return fmt.Errorf("invalid from address: %s", req.GetFrom())
+	}
+	if !common.IsHexAddress(req.GetTo()) {
+		return fmt.Errorf("invalid to address: %s", req.GetTo())
+	}
+	if !common.IsHexAddress(req.GetContractAddress()) {
+		return fmt.Errorf("invalid contract address: %s", req.GetContractAddress())
+	}
+	if len(req.GetAmount()) == 0 {
+		return fmt.Errorf("amount must not be empty")
+	}
+
+	fromAddr := common.HexToAddress(req.GetFrom())
+	toAddr := common.HexToAddress(req.GetTo())
+	contractAddr := common.HexToAddress(req.GetContractAddress())
+	amount := new(big.Int).SetBytes(req.GetAmount())
+
+	contractAbi, err := abi.JSON(strings.NewReader(domain.ContractABI))
+	if err != nil {
+		return fmt.Errorf("failed to parse contract ABI: %w", err)
+	}
+
+	data, err := contractAbi.Pack("transfer", toAddr, amount)
+	if err != nil {
+		return fmt.Errorf("failed to pack transfer input: %w", err)
+	}
+
+	callArg := map[string]interface{}{
+		"from": fromAddr.Hex(),
+		"to":   contractAddr.Hex(),
+		"data": hexutil.Bytes(data),
+	}
+
+	var result hexutil.Bytes
+	err = s.evmClient.RPCClient().CallContext(ctx, &result, "eth_call", callArg, "latest")
+	if err != nil {
+		return fmt.Errorf("simulation failed: %w", err)
+	}
+
+	if len(result) > 0 {
+		var transferSuccess bool
+		err = contractAbi.UnpackIntoInterface(&transferSuccess, "transfer", result)
+		if err == nil && !transferSuccess {
+			return fmt.Errorf("simulation succeeded but returned false")
+		}
+	}
+
+	return nil
+}
+
+func (s *BlockchainService) getNonce(ctx context.Context, account common.Address) (uint64, error) {
+	var nonce hexutil.Uint64
+	err := s.evmClient.RPCClient().CallContext(ctx, &nonce, "eth_getTransactionCount", account.Hex(), "latest")
+	if err != nil {
+		return 0, err
+	}
+	return uint64(nonce), nil
+}
+
+func (s *BlockchainService) getGasLimit(ctx context.Context, from, to common.Address, data []byte) (uint64, error) {
+	callArg := map[string]interface{}{
+		"from": from.Hex(),
+		"to":   to.Hex(),
+		"data": hexutil.Bytes(data),
+	}
+	var gas hexutil.Uint64
+	err := s.evmClient.RPCClient().CallContext(ctx, &gas, "eth_estimateGas", callArg)
+	if err != nil {
+		return 0, err
+	}
+	return uint64(gas), nil
+}
+
+func (s *BlockchainService) getFees(ctx context.Context) (*big.Int, *big.Int, error) {
+	var maxPriorityFee hexutil.Big
+	err := s.evmClient.RPCClient().CallContext(ctx, &maxPriorityFee, "eth_maxPriorityFeePerGas")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	header, err := s.getHeaderByNumber(ctx, "latest")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	baseFee := header.BaseFee
+	if baseFee == nil {
+		// Fallback for non-EIP1559 networks: use eth_gasPrice
+		var gasPrice hexutil.Big
+		err = s.evmClient.RPCClient().CallContext(ctx, &gasPrice, "eth_gasPrice")
+		if err != nil {
+			return nil, nil, err
+		}
+		return (*big.Int)(&gasPrice), (*big.Int)(&maxPriorityFee), nil
+	}
+
+	// MaxFeePerGas = 2 * BaseFee + MaxPriorityFeePerGas
+	maxFeePerGas := new(big.Int).Mul(baseFee, big.NewInt(2))
+	maxFeePerGas.Add(maxFeePerGas, (*big.Int)(&maxPriorityFee))
+
+	return maxFeePerGas, (*big.Int)(&maxPriorityFee), nil
 }
