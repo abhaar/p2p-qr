@@ -25,7 +25,7 @@ message ERC20TransferIntent {
   string from = 1;
   string to = 2;
   string contractAddress = 3;
-  bytes amount = 4;
+  string amount = 4;
 }
 
 message TransactionIntentRequest {

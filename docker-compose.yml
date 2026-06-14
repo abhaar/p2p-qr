@@ -72,12 +72,26 @@ services:
     networks:
       - p2p-network
 
+  broadcaster-service:
+    build:
+      context: .
+      dockerfile: services/blockchain/broadcaster/Dockerfile
+    ports:
+      - "50067:50067"
+    command:
+      - "-protocol-service-endpoint=protocol-service:50065"
+      - "-network-id=ETHEREUM"
+    depends_on:
+      - protocol-service
+    networks:
+      - p2p-network
+
   anvil:
     image: ghcr.io/foundry-rs/foundry:latest
     container_name: anvil-node
     ports:
       - "8545:8545"
-    entrypoint: ["anvil", "--host", "0.0.0.0", "--block-time", "1"]
+    entrypoint: ["anvil", "--host", "0.0.0.0", "--block-time", "3"]
     networks:
       - p2p-network
 

@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/p2p/blockchain/broadcaster/v2/service"
+	signingservice "github.com/p2p/blockchain/signer/v2/service"
 	"github.com/p2p/shared/pb/blockchain/broadcaster"
 	"github.com/p2p/shared/pb/blockchain/protocol"
 	"go.uber.org/zap"
@@ -43,8 +44,9 @@ func main() {
 	defer protocolConn.Close()
 
 	protocolClient := protocol.NewProtocolServiceClient(protocolConn)
+	sigService := &signingservice.InMemorySigner{}
 
-	broadcastService := service.NewBroadcastService(logger, conf.NetworkID, protocolClient)
+	broadcastService := service.NewBroadcastService(logger, conf.NetworkID, protocolClient, sigService)
 
 	grpcServer := grpc.NewServer()
 	broadcaster.RegisterBroadcastServiceServer(grpcServer, broadcastService)

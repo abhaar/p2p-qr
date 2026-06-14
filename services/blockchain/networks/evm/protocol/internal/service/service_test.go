@@ -98,24 +98,19 @@ func TestBlockchainService(t *testing.T) {
 
 	t.Logf("Successfully retrieved events for block %d, found %d mapped events", eventsResp.BlockHeight, len(eventsResp.Events))
 	/*
-	for idx, event := range eventsResp.Events {
-		t.Logf("  Event %d: TxHash: %s, Token: %s, From: %s, To: %s, Amount: %s",
-			idx, event.TxHash, event.TokenId, event.From, event.To, event.Amount)
-	}
+		for idx, event := range eventsResp.Events {
+			t.Logf("  Event %d: TxHash: %s, Token: %s, From: %s, To: %s, Amount: %s",
+				idx, event.TxHash, event.TokenId, event.From, event.To, event.Amount)
+		}
 	*/
 
 	// Test PrepareTransaction
 	t.Run("PrepareTransaction Success", func(t *testing.T) {
-		intent := &broadcaster.EVMTransactionIntent{
-			IntentType: broadcaster.EVMTransactionIntent_INTENT_TYPE_ERC20_TRANSFER,
-			Intent: &broadcaster.EVMTransactionIntent_Erc20TransferIntent{
-				Erc20TransferIntent: &broadcaster.ERC20TransferIntent{
-					From:            "0x93310a56147b1eA7486Ab84F8D850FD0A216429B",
-					To:              "0x42F052F625E28c802f04978909Ece3f9d6e5E3a1",
-					ContractAddress: "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9",
-					Amount:          big.NewInt(1).Bytes(),
-				},
-			},
+		intent := &broadcaster.ERC20TransferIntent{
+			From:            "0x93310a56147b1eA7486Ab84F8D850FD0A216429B",
+			To:              "0x42F052F625E28c802f04978909Ece3f9d6e5E3a1",
+			ContractAddress: "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9",
+			Amount:          big.NewInt(1).String(),
 		}
 
 		anyIntent, err := anypb.New(intent)
@@ -134,16 +129,11 @@ func TestBlockchainService(t *testing.T) {
 
 	t.Run("PrepareTransaction Insufficient Balance Failure", func(t *testing.T) {
 		hugeAmount, _ := new(big.Int).SetString("10000000000000000000000000000000000000000000", 10)
-		intent := &broadcaster.EVMTransactionIntent{
-			IntentType: broadcaster.EVMTransactionIntent_INTENT_TYPE_ERC20_TRANSFER,
-			Intent: &broadcaster.EVMTransactionIntent_Erc20TransferIntent{
-				Erc20TransferIntent: &broadcaster.ERC20TransferIntent{
-					From:            "0x93310a56147b1eA7486Ab84F8D850FD0A216429B",
-					To:              "0x42F052F625E28c802f04978909Ece3f9d6e5E3a1",
-					ContractAddress: "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9",
-					Amount:          hugeAmount.Bytes(),
-				},
-			},
+		intent := &broadcaster.ERC20TransferIntent{
+			From:            "0x93310a56147b1eA7486Ab84F8D850FD0A216429B",
+			To:              "0x42F052F625E28c802f04978909Ece3f9d6e5E3a1",
+			ContractAddress: "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9",
+			Amount:          hugeAmount.String(),
 		}
 
 		anyIntent, err := anypb.New(intent)
@@ -160,16 +150,11 @@ func TestBlockchainService(t *testing.T) {
 	})
 
 	t.Run("PrepareTransaction Invalid Address Failure", func(t *testing.T) {
-		intent := &broadcaster.EVMTransactionIntent{
-			IntentType: broadcaster.EVMTransactionIntent_INTENT_TYPE_ERC20_TRANSFER,
-			Intent: &broadcaster.EVMTransactionIntent_Erc20TransferIntent{
-				Erc20TransferIntent: &broadcaster.ERC20TransferIntent{
-					From:            "invalid_address",
-					To:              "0x42F052F625E28c802f04978909Ece3f9d6e5E3a1",
-					ContractAddress: "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9",
-					Amount:          big.NewInt(1).Bytes(),
-				},
-			},
+		intent := &broadcaster.ERC20TransferIntent{
+			From:            "invalid_address",
+			To:              "0x42F052F625E28c802f04978909Ece3f9d6e5E3a1",
+			ContractAddress: "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9",
+			Amount:          big.NewInt(1).String(),
 		}
 
 		anyIntent, err := anypb.New(intent)

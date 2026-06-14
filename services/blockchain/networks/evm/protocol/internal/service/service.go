@@ -125,87 +125,83 @@ func (s *BlockchainService) PrepareTransaction(ctx context.Context, in *anypb.An
 		return nil, fmt.Errorf("prepare transaction request must not be empty")
 	}
 
-	if !in.MessageIs((*broadcaster.EVMTransactionIntent)(nil)) {
+	if !in.MessageIs((*broadcaster.ERC20TransferIntent)(nil)) {
 		s.logger.Error("invalid transaction type received for prepare transaction", zap.String("type", in.GetTypeUrl()))
 		return nil, fmt.Errorf("invalid transaction type received: %s", in.GetTypeUrl())
 	}
 
-	intent := &broadcaster.EVMTransactionIntent{}
-	err := anypb.UnmarshalTo(in, intent, proto.UnmarshalOptions{})
+	erc20TransferIntent := &broadcaster.ERC20TransferIntent{}
+	err := anypb.UnmarshalTo(in, erc20TransferIntent, proto.UnmarshalOptions{})
 	if err != nil {
-		s.logger.Error("failed to unmarshal intent into EVMTransactionIntent", zap.Error(err))
+		s.logger.Error("failed to unmarshal intent into ERC20TransferIntent", zap.Error(err))
 		return nil, fmt.Errorf("invalid transaction type received: %s", in.GetTypeUrl())
 	}
 
-	switch intent.GetIntentType() {
-	case broadcaster.EVMTransactionIntent_INTENT_TYPE_ERC20_TRANSFER:
-		s.logger.Info("request to validate erc-20 transfer received")
-		if err := s.validateErc20TransferRequest(ctx, intent.GetErc20TransferIntent()); err != nil {
-			return nil, err
-		}
-
-		erc20TransferIntent := intent.GetErc20TransferIntent()
-		if !common.IsHexAddress(erc20TransferIntent.GetFrom()) {
-			return nil, fmt.Errorf("invalid from address: %s", erc20TransferIntent.GetFrom())
-		}
-		if !common.IsHexAddress(erc20TransferIntent.GetTo()) {
-			return nil, fmt.Errorf("invalid to address: %s", erc20TransferIntent.GetTo())
-		}
-		if !common.IsHexAddress(erc20TransferIntent.GetContractAddress()) {
-			return nil, fmt.Errorf("invalid contract address: %s", erc20TransferIntent.GetContractAddress())
-		}
-		if len(erc20TransferIntent.GetAmount()) == 0 {
-			return nil, fmt.Errorf("amount must not be empty")
-		}
-
-		from := common.HexToAddress(erc20TransferIntent.GetFrom())
-		to := common.HexToAddress(erc20TransferIntent.GetContractAddress())
-		recipient := common.HexToAddress(erc20TransferIntent.GetTo())
-		amount := new(big.Int).SetBytes(erc20TransferIntent.GetAmount())
-
-		contractAbi, err := abi.JSON(strings.NewReader(domain.ContractABI))
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse contract ABI: %w", err)
-		}
-
-		data, err := contractAbi.Pack("transfer", recipient, amount)
-		if err != nil {
-			return nil, fmt.Errorf("failed to pack transfer input: %w", err)
-		}
-
-		nonce, err := s.getNonce(ctx, from)
-		if err != nil {
-			s.logger.Error("failed to get nonce", zap.Error(err))
-			return nil, err
-		}
-
-		gasLimit, err := s.getGasLimit(ctx, from, to, data)
-		if err != nil {
-			s.logger.Error("failed to calculate gas limit", zap.Error(err))
-			return nil, err
-		}
-
-		maxFeePerGas, maxPriorityFeePerGas, err := s.getFees(ctx)
-		if err != nil {
-			s.logger.Error("failed to calculate fees", zap.Error(err))
-			return nil, err
-		}
-
-		return &signer.UnsignedEvmTransaction{
-			NetworkId:            s.networkID,
-			From:                 from.Hex(),
-			Nonce:                nonce,
-			To:                   to.Hex(),
-			GasLimit:             gasLimit,
-			MaxPriorityFeePerGas: maxPriorityFeePerGas.Bytes(),
-			MaxFeePerGas:         maxFeePerGas.Bytes(),
-			Data:                 data,
-		}, nil
-
-	default:
-		s.logger.Error("request to valdiate invalid evm intent type received", zap.Stringer("type", intent.GetIntentType()))
-		return nil, fmt.Errorf("request to valdiate invalid evm intent type received")
+	s.logger.Info("request to validate erc-20 transfer received")
+	if err := s.validateErc20TransferRequest(ctx, erc20TransferIntent); err != nil {
+		return nil, err
 	}
+
+	if !common.IsHexAddress(erc20TransferIntent.GetFrom()) {
+		return nil, fmt.Errorf("invalid from address: %s", erc20TransferIntent.GetFrom())
+	}
+	if !common.IsHexAddress(erc20TransferIntent.GetTo()) {
+		return nil, fmt.Errorf("invalid to address: %s", erc20TransferIntent.GetTo())
+	}
+	if !common.IsHexAddress(erc20TransferIntent.GetContractAddress()) {
+		return nil, fmt.Errorf("invalid contract address: %s", erc20TransferIntent.GetContractAddress())
+	}
+	if erc20TransferIntent.GetAmount() == "" {
+		return nil, fmt.Errorf("amount must not be empty")
+	}
+
+	from := common.HexToAddress(erc20TransferIntent.GetFrom())
+	to := common.HexToAddress(erc20TransferIntent.GetContractAddress())
+	recipient := common.HexToAddress(erc20TransferIntent.GetTo())
+
+	amount, ok := new(big.Int).SetString(erc20TransferIntent.GetAmount(), 10)
+	if !ok {
+		s.logger.Error("failed to parse amount as base 10", zap.String("amount", erc20TransferIntent.GetAmount()))
+	}
+
+	contractAbi, err := abi.JSON(strings.NewReader(domain.ContractABI))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse contract ABI: %w", err)
+	}
+
+	data, err := contractAbi.Pack("transfer", recipient, amount)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pack transfer input: %w", err)
+	}
+
+	nonce, err := s.getNonce(ctx, from)
+	if err != nil {
+		s.logger.Error("failed to get nonce", zap.Error(err))
+		return nil, err
+	}
+
+	gasLimit, err := s.getGasLimit(ctx, from, to, data)
+	if err != nil {
+		s.logger.Error("failed to calculate gas limit", zap.Error(err))
+		return nil, err
+	}
+
+	maxFeePerGas, maxPriorityFeePerGas, err := s.getFees(ctx)
+	if err != nil {
+		s.logger.Error("failed to calculate fees", zap.Error(err))
+		return nil, err
+	}
+
+	return &signer.UnsignedEvmTransaction{
+		NetworkId:            s.networkID,
+		From:                 from.Hex(),
+		Nonce:                nonce,
+		To:                   to.Hex(),
+		GasLimit:             gasLimit,
+		MaxPriorityFeePerGas: maxPriorityFeePerGas.Bytes(),
+		MaxFeePerGas:         maxFeePerGas.Bytes(),
+		Data:                 data,
+	}, nil
 }
 
 func (s *BlockchainService) Transfer(ctx context.Context, req *signer.SignedTransaction) (*protocol.TransferResponse, error) {
@@ -321,7 +317,11 @@ func (s *BlockchainService) validateErc20TransferRequest(ctx context.Context, re
 	fromAddr := common.HexToAddress(req.GetFrom())
 	toAddr := common.HexToAddress(req.GetTo())
 	contractAddr := common.HexToAddress(req.GetContractAddress())
-	amount := new(big.Int).SetBytes(req.GetAmount())
+
+	amount, ok := new(big.Int).SetString(req.GetAmount(), 10)
+	if !ok {
+		s.logger.Error("failed to parse amount as base 10", zap.String("amount", req.GetAmount()))
+	}
 
 	contractAbi, err := abi.JSON(strings.NewReader(domain.ContractABI))
 	if err != nil {

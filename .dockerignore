@@ -1,0 +1,15 @@
+# Ignore git files
+.git
+.gitignore
+
+# Ignore local databases and config files
+nui-db/
+nats-connections.json
+
+# Ignore raw protobuf definitions (only compiled Go files in shared/pb/ are needed)
+shared/proto/
+
+# Ignore local development configurations
+docker-compose.yml
+Makefile
+README.md

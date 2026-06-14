@@ -1,4 +1,3 @@
-// Package service defines the signer service.
 package service
 
 import (
@@ -10,7 +9,9 @@ import (
 	"github.com/p2p/shared/pb/blockchain/signer"
 )
 
-type InMemorySigner struct{}
+type InMemorySigner struct {
+	signer.UnimplementedSigningServiceServer
+}
 
 func (s *InMemorySigner) SignTransaction(ctx context.Context, req *signer.UnsignedTransactionRequest) (*signer.SignedTransaction, error) {
 	if req == nil {

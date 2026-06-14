@@ -4,12 +4,12 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 
-	"github.com/p2p/blockchain/signer/v2/api"
 	"github.com/p2p/shared/pb/blockchain/broadcaster"
 	"github.com/p2p/shared/pb/blockchain/network"
 	"github.com/p2p/shared/pb/blockchain/protocol"
-	"github.com/p2p/shared/pb/blockchain/signer"
+	signerpb "github.com/p2p/shared/pb/blockchain/signer"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -19,14 +19,15 @@ type BroadcastService struct {
 	logger         *zap.Logger
 	networkID      network.NetworkId
 	protocolClient protocol.ProtocolServiceClient
-	signer         api.Signer
+	signer         signerpb.SigningServiceServer
 }
 
-func NewBroadcastService(logger *zap.Logger, networkId network.NetworkId, protocolClient protocol.ProtocolServiceClient) *BroadcastService {
+func NewBroadcastService(logger *zap.Logger, networkID network.NetworkId, protocolClient protocol.ProtocolServiceClient, signer signerpb.SigningServiceServer) *BroadcastService {
 	return &BroadcastService{
 		logger:         logger,
-		networkID:      networkId,
+		networkID:      networkID,
 		protocolClient: protocolClient,
+		signer:         signer,
 	}
 }
 
@@ -41,6 +42,7 @@ func (s *BroadcastService) SendTransaction(ctx context.Context, req *broadcaster
 
 	switch req.IntentType {
 	case broadcaster.TransactionIntentRequest_INTENT_TYPE_TRANSFER:
+		log.Printf("type: %+v", req.IntentPayload)
 		return s.sendTransfer(ctx, req.GetIntentPayload())
 	default:
 		return nil, fmt.Errorf("invalid intent type: %T", req.IntentType)
@@ -48,19 +50,23 @@ func (s *BroadcastService) SendTransaction(ctx context.Context, req *broadcaster
 }
 
 func (s *BroadcastService) sendTransfer(ctx context.Context, req *anypb.Any) (*broadcaster.TransactionIntentResponse, error) {
+	s.logger.Info("received transfer request", zap.String("type", req.GetTypeUrl()))
 	unsignedTx, err := s.protocolClient.PrepareTransaction(ctx, req)
 	if err != nil {
 		s.logger.Warn("prepare transfer failed", zap.Error(err))
 		return nil, err
 	}
 
-	signTransactionRequest := signer.UnsignedTransactionRequest{
+	s.logger.Info("transfer request validated")
+
+	signTransactionRequest := signerpb.UnsignedTransactionRequest{
 		NetworkId: s.networkID,
-		Request: &signer.UnsignedTransactionRequest_Evm{
+		Request: &signerpb.UnsignedTransactionRequest_Evm{
 			Evm: unsignedTx,
 		},
 	}
 
+	s.logger.Info("getting transfer request signed")
 	signedTransaction, err := s.signer.SignTransaction(ctx, &signTransactionRequest)
 	if err != nil {
 		s.logger.Warn("prepare transfer failed", zap.Error(err))
@@ -70,6 +76,7 @@ func (s *BroadcastService) sendTransfer(ctx context.Context, req *anypb.Any) (*b
 		}, nil
 	}
 
+	s.logger.Info("broadcasting transaction")
 	txResponse, err := s.protocolClient.Transfer(ctx, signedTransaction)
 	if err != nil {
 		s.logger.Error("transfer failed", zap.Error(err))
