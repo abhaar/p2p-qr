@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
 	"github.com/p2p/custody/v2/internal/domain"
@@ -79,14 +80,13 @@ func (s *CustodyService) GetBalance(ctx context.Context, address, currency strin
 		return domain.Balance{}, err
 	}
 
-	decimals := big.NewInt(1000000)
-	normalizedAmount := new(big.Int)
-	normalizedAmount.Div(balance, decimals)
+	// Convert balance (uint256 in smallest unit) to a decimal scaled by 10^-6
+	decBalance := decimal.NewFromBigInt(balance, -6)
 
 	return domain.Balance{
 		Address:  address,
 		Currency: currency,
-		Amount:   normalizedAmount.String(),
+		Amount:   decBalance.String(),
 	}, nil
 }
 

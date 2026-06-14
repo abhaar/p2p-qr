@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
 	"github.com/p2p/custody/v2/internal/domain"
@@ -71,10 +72,16 @@ func (s *Server) handleTransfer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	parsedAmount, err := parseDecimalAmount(req.Amount)
+	if err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid amount: %v", err))
+		return
+	}
+
 	result, err := s.custody.Transfer(r.Context(), domain.TransferIntent{
 		From:     req.From,
 		To:       req.To,
-		Amount:   req.Amount,
+		Amount:   parsedAmount,
 		Currency: req.Currency,
 	})
 	if err != nil {
@@ -87,6 +94,36 @@ func (s *Server) handleTransfer(w http.ResponseWriter, r *http.Request) {
 		TxHash: result.TxHash,
 		Status: result.Status,
 	})
+}
+
+// parseDecimalAmount parses a decimal amount string, validates that it has at most 6 decimal places,
+// and returns the amount multiplied by 1,000,000 as a big.Int string.
+func parseDecimalAmount(amountStr string) (string, error) {
+	amountStr = strings.TrimSpace(amountStr)
+	if amountStr == "" {
+		return "", fmt.Errorf("amount is empty")
+	}
+
+	d, err := decimal.NewFromString(amountStr)
+	if err != nil {
+		return "", fmt.Errorf("invalid decimal format")
+	}
+
+	if d.Sign() <= 0 {
+		return "", fmt.Errorf("must be greater than zero")
+	}
+
+	// Multiply by 1,000,000
+	multiplier := decimal.NewFromInt(1000000)
+	scaled := d.Mul(multiplier)
+
+	// If the scaled value is not an integer, it means the original number
+	// had more than 6 decimal places.
+	if !scaled.IsInteger() {
+		return "", fmt.Errorf("exceeds maximum of 6 decimal places")
+	}
+
+	return scaled.StringFixed(0), nil
 }
 
 // writeJSON marshals v as JSON and writes it to w with the given status code.
