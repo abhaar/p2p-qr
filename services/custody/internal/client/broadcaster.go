@@ -4,6 +4,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/p2p/custody/v2/internal/domain"
 	"github.com/p2p/shared/pb/blockchain/broadcaster"
@@ -13,7 +14,12 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-const usdcContractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+func getUSDCContractAddress() string {
+	if envAddr := os.Getenv("USDC_CONTRACT_ADDRESS"); envAddr != "" {
+		return envAddr
+	}
+	return "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+}
 
 // BroadcasterClient wraps the gRPC BroadcastServiceClient and satisfies
 // domain.Broadcaster.
@@ -47,7 +53,7 @@ func (b *BroadcasterClient) SendTransfer(ctx context.Context, intent domain.Tran
 			Erc20TransferIntent: &broadcaster.ERC20TransferIntent{
 				From:            intent.From,
 				To:              intent.To,
-				ContractAddress: usdcContractAddress,
+				ContractAddress: getUSDCContractAddress(),
 				Amount:          intent.Amount,
 			},
 		},
@@ -83,6 +89,20 @@ func (b *BroadcasterClient) SendTransfer(ctx context.Context, intent domain.Tran
 		TxHash: resp.GetTransactionId(),
 		Status: status,
 	}, nil
+}
+
+// GetTokenBalance queries the on-chain ERC-20 token balance for the given
+// address via the broadcaster → protocol → node chain.
+func (b *BroadcasterClient) GetTokenBalance(ctx context.Context, address, contractAddress string) (string, error) {
+	resp, err := b.client.GetTokenBalance(ctx, &broadcaster.GetTokenBalanceRequest{
+		NetworkId:       network.NetworkId_NETWORK_ID_ETHEREUM,
+		Address:         address,
+		ContractAddress: contractAddress,
+	})
+	if err != nil {
+		return "", fmt.Errorf("broadcaster GetTokenBalance: %w", err)
+	}
+	return resp.GetBalance(), nil
 }
 
 // Close tears down the underlying gRPC connection.

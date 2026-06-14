@@ -3,6 +3,9 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"math/big"
+	"os"
 
 	"go.uber.org/zap"
 
@@ -26,18 +29,51 @@ func NewCustodyService(logger *zap.Logger, broadcaster domain.Broadcaster) *Cust
 // Compile-time check that CustodyService satisfies the domain interface.
 var _ domain.CustodyService = (*CustodyService)(nil)
 
-// GetBalance returns the USDC balance for the given address.
+// defaultUsdcContractAddress is the USDC contract address deployed on local Anvil by default.
+const defaultUsdcContractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+
+func getUSDCContractAddress() string {
+	if envAddr := os.Getenv("USDC_CONTRACT_ADDRESS"); envAddr != "" {
+		return envAddr
+	}
+	return defaultUsdcContractAddress
+}
+
+// GetBalance returns the token balance for the given address by querying the
+// broadcaster service, which in turn calls the protocol service to read the
+// balance from the blockchain node.
 func (s *CustodyService) GetBalance(ctx context.Context, address, currency string) (*domain.Balance, error) {
 	s.logger.Info("fetching balance",
 		zap.String("address", address),
 		zap.String("currency", currency),
 	)
 
-	// TODO: replace stub with on-chain USDC balance lookup.
+	var contractAddress string
+	if currency == "USDC" {
+		contractAddress = getUSDCContractAddress()
+	} else {
+		return nil, fmt.Errorf("unsupported currency: %s", currency)
+	}
+
+	amount, err := s.broadcaster.GetTokenBalance(ctx, address, contractAddress)
+	if err != nil {
+		s.logger.Error("failed to fetch balance", zap.Error(err))
+		return nil, err
+	}
+
+	amountBigInt, ok := new(big.Int).SetString(amount, 10)
+	if !ok {
+		s.logger.Error("invalid amount received as balance from broadcaster", zap.String("amount", amount))
+	}
+
+	decimals := big.NewInt(1000000)
+	normalizedAmount := new(big.Int)
+	normalizedAmount.Div(amountBigInt, decimals)
+
 	return &domain.Balance{
 		Address:  address,
 		Currency: currency,
-		Amount:   "0",
+		Amount:   decimals.String(),
 	}, nil
 }
 

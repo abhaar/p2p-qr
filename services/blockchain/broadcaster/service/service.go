@@ -99,3 +99,31 @@ func (s *BroadcastService) sendTransfer(ctx context.Context, req *anypb.Any) (*b
 		TransactionId: txResponse.GetTxHash(),
 	}, nil
 }
+
+func (s *BroadcastService) GetTokenBalance(ctx context.Context, req *broadcaster.GetTokenBalanceRequest) (*broadcaster.GetTokenBalanceResponse, error) {
+	if req == nil {
+		return nil, fmt.Errorf("request must not be empty")
+	}
+
+	if req.NetworkId != s.networkID {
+		return nil, fmt.Errorf("request received for invalid network: %s", req.NetworkId.String())
+	}
+
+	s.logger.Info("received get token balance request",
+		zap.String("address", req.GetAddress()),
+		zap.String("contract_address", req.GetContractAddress()),
+	)
+
+	resp, err := s.protocolClient.GetTokenBalance(ctx, &protocol.GetTokenBalanceRequest{
+		Address:         req.GetAddress(),
+		ContractAddress: req.GetContractAddress(),
+	})
+	if err != nil {
+		s.logger.Warn("get token balance failed", zap.Error(err))
+		return nil, err
+	}
+
+	return &broadcaster.GetTokenBalanceResponse{
+		Balance: resp.GetBalance(),
+	}, nil
+}

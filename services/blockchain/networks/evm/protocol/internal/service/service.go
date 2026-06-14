@@ -238,6 +238,76 @@ func (s *BlockchainService) Transfer(ctx context.Context, req *signer.SignedTran
 	}, nil
 }
 
+// GetTokenBalance retrieves the ERC-20 token balance for a given address and contract.
+func (s *BlockchainService) GetTokenBalance(ctx context.Context, req *protocol.GetTokenBalanceRequest) (*protocol.GetTokenBalanceResponse, error) {
+	if req == nil {
+		return nil, fmt.Errorf("GetTokenBalanceRequest must not be nil")
+	}
+
+	if !common.IsHexAddress(req.GetAddress()) {
+		return nil, fmt.Errorf("invalid address: %s", req.GetAddress())
+	}
+	if !common.IsHexAddress(req.GetContractAddress()) {
+		return nil, fmt.Errorf("invalid contract address: %s", req.GetContractAddress())
+	}
+
+	s.logger.Info("request to get token balance received",
+		zap.String("address", req.GetAddress()),
+		zap.String("contract_address", req.GetContractAddress()),
+	)
+
+	parsedABI, err := abi.JSON(strings.NewReader(domain.ContractABI))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse contract ABI: %w", err)
+	}
+
+	addr := common.HexToAddress(req.GetAddress())
+	data, err := parsedABI.Pack("balanceOf", addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pack balanceOf input: %w", err)
+	}
+
+	contractAddr := common.HexToAddress(req.GetContractAddress())
+	callArg := map[string]interface{}{
+		"to":   contractAddr.Hex(),
+		"data": hexutil.Bytes(data),
+	}
+
+	var result hexutil.Bytes
+	err = s.evmClient.RPCClient().CallContext(ctx, &result, "eth_call", callArg, "latest")
+	if err != nil {
+		return nil, fmt.Errorf("eth_call for balanceOf failed: %w", err)
+	}
+
+	if len(result) == 0 {
+		return nil, fmt.Errorf("contract call returned empty data (check if contract is deployed at %s)", req.GetContractAddress())
+	}
+
+	var balance *big.Int
+	err = parsedABI.UnpackIntoInterface(&balance, "balanceOf", result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack balanceOf result: %w", err)
+	}
+
+	s.logger.Info("token balance retrieved",
+		zap.String("address", req.GetAddress()),
+		zap.String("contract_address", req.GetContractAddress()),
+		zap.String("balance", balance.String()),
+	)
+
+	return &protocol.GetTokenBalanceResponse{
+		Balance: balance.String(),
+	}, nil
+}
+
+func mustABIType(t string) abi.Type {
+	typ, err := abi.NewType(t, "", nil)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create ABI type %s: %v", t, err))
+	}
+	return typ
+}
+
 func (s *BlockchainService) getHeaderByNumber(ctx context.Context, number string) (*types.Header, error) {
 	var header *types.Header
 	err := s.evmClient.RPCClient().CallContext(ctx, &header, "eth_getBlockByNumber", number, false)

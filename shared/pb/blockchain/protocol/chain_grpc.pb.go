@@ -27,6 +27,7 @@ const (
 	ProtocolService_GetBlockEvents_FullMethodName     = "/protocol.ProtocolService/GetBlockEvents"
 	ProtocolService_PrepareTransaction_FullMethodName = "/protocol.ProtocolService/PrepareTransaction"
 	ProtocolService_Transfer_FullMethodName           = "/protocol.ProtocolService/Transfer"
+	ProtocolService_GetTokenBalance_FullMethodName    = "/protocol.ProtocolService/GetTokenBalance"
 )
 
 // ProtocolServiceClient is the client API for ProtocolService service.
@@ -37,6 +38,7 @@ type ProtocolServiceClient interface {
 	GetBlockEvents(ctx context.Context, in *GetBlockEventsRequest, opts ...grpc.CallOption) (*BlockchainEvents, error)
 	PrepareTransaction(ctx context.Context, in *anypb.Any, opts ...grpc.CallOption) (*signer.UnsignedEvmTransaction, error)
 	Transfer(ctx context.Context, in *signer.SignedTransaction, opts ...grpc.CallOption) (*TransferResponse, error)
+	GetTokenBalance(ctx context.Context, in *GetTokenBalanceRequest, opts ...grpc.CallOption) (*GetTokenBalanceResponse, error)
 }
 
 type protocolServiceClient struct {
@@ -87,6 +89,16 @@ func (c *protocolServiceClient) Transfer(ctx context.Context, in *signer.SignedT
 	return out, nil
 }
 
+func (c *protocolServiceClient) GetTokenBalance(ctx context.Context, in *GetTokenBalanceRequest, opts ...grpc.CallOption) (*GetTokenBalanceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTokenBalanceResponse)
+	err := c.cc.Invoke(ctx, ProtocolService_GetTokenBalance_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProtocolServiceServer is the server API for ProtocolService service.
 // All implementations must embed UnimplementedProtocolServiceServer
 // for forward compatibility.
@@ -95,6 +107,7 @@ type ProtocolServiceServer interface {
 	GetBlockEvents(context.Context, *GetBlockEventsRequest) (*BlockchainEvents, error)
 	PrepareTransaction(context.Context, *anypb.Any) (*signer.UnsignedEvmTransaction, error)
 	Transfer(context.Context, *signer.SignedTransaction) (*TransferResponse, error)
+	GetTokenBalance(context.Context, *GetTokenBalanceRequest) (*GetTokenBalanceResponse, error)
 	mustEmbedUnimplementedProtocolServiceServer()
 }
 
@@ -116,6 +129,9 @@ func (UnimplementedProtocolServiceServer) PrepareTransaction(context.Context, *a
 }
 func (UnimplementedProtocolServiceServer) Transfer(context.Context, *signer.SignedTransaction) (*TransferResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Transfer not implemented")
+}
+func (UnimplementedProtocolServiceServer) GetTokenBalance(context.Context, *GetTokenBalanceRequest) (*GetTokenBalanceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTokenBalance not implemented")
 }
 func (UnimplementedProtocolServiceServer) mustEmbedUnimplementedProtocolServiceServer() {}
 func (UnimplementedProtocolServiceServer) testEmbeddedByValue()                         {}
@@ -210,6 +226,24 @@ func _ProtocolService_Transfer_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProtocolService_GetTokenBalance_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTokenBalanceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProtocolServiceServer).GetTokenBalance(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProtocolService_GetTokenBalance_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProtocolServiceServer).GetTokenBalance(ctx, req.(*GetTokenBalanceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProtocolService_ServiceDesc is the grpc.ServiceDesc for ProtocolService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -232,6 +266,10 @@ var ProtocolService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Transfer",
 			Handler:    _ProtocolService_Transfer_Handler,
+		},
+		{
+			MethodName: "GetTokenBalance",
+			Handler:    _ProtocolService_GetTokenBalance_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -53,6 +53,17 @@ message TransactionIntentResponse {
   string errorMessage = 3;
 }
 
+message GetTokenBalanceRequest {
+  network.NetworkId networkId = 1;
+  string address = 2;
+  string contract_address = 3;
+}
+
+message GetTokenBalanceResponse {
+  string balance = 1;
+}
+
 service BroadcastService {
   rpc SendTransaction(TransactionIntentRequest) returns (TransactionIntentResponse);
+  rpc GetTokenBalance(GetTokenBalanceRequest) returns (GetTokenBalanceResponse);
 }

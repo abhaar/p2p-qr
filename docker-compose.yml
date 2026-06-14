@@ -86,6 +86,20 @@ services:
     networks:
       - p2p-network
 
+  custody-service:
+    build:
+      context: .
+      dockerfile: services/custody/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - BROADCASTER_ENDPOINT=broadcaster-service:50067
+    depends_on:
+      - broadcaster-service
+    networks:
+      - p2p-network
+
   anvil:
     image: ghcr.io/foundry-rs/foundry:latest
     container_name: anvil-node

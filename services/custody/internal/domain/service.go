@@ -15,6 +15,10 @@ type CustodyService interface {
 // Broadcaster abstracts the blockchain broadcaster service.
 // The concrete implementation wraps the gRPC BroadcastServiceClient.
 type Broadcaster interface {
+	// GetTokenBalance returns the on-chain token balance for the given address
+	// and contract. The returned amount is in the token's smallest unit.
+	GetTokenBalance(ctx context.Context, address, contractAddress string) (string, error)
+
 	// SendTransfer submits an ERC-20 transfer to the broadcaster service and
 	// returns the resulting transaction hash and status.
 	SendTransfer(ctx context.Context, intent TransferIntent) (*TransferResult, error)

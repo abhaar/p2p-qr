@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	BroadcastService_SendTransaction_FullMethodName = "/broadcaster.BroadcastService/SendTransaction"
+	BroadcastService_GetTokenBalance_FullMethodName = "/broadcaster.BroadcastService/GetTokenBalance"
 )
 
 // BroadcastServiceClient is the client API for BroadcastService service.
@@ -29,6 +30,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type BroadcastServiceClient interface {
 	SendTransaction(ctx context.Context, in *TransactionIntentRequest, opts ...grpc.CallOption) (*TransactionIntentResponse, error)
+	GetTokenBalance(ctx context.Context, in *GetTokenBalanceRequest, opts ...grpc.CallOption) (*GetTokenBalanceResponse, error)
 }
 
 type broadcastServiceClient struct {
@@ -49,11 +51,22 @@ func (c *broadcastServiceClient) SendTransaction(ctx context.Context, in *Transa
 	return out, nil
 }
 
+func (c *broadcastServiceClient) GetTokenBalance(ctx context.Context, in *GetTokenBalanceRequest, opts ...grpc.CallOption) (*GetTokenBalanceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTokenBalanceResponse)
+	err := c.cc.Invoke(ctx, BroadcastService_GetTokenBalance_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BroadcastServiceServer is the server API for BroadcastService service.
 // All implementations must embed UnimplementedBroadcastServiceServer
 // for forward compatibility.
 type BroadcastServiceServer interface {
 	SendTransaction(context.Context, *TransactionIntentRequest) (*TransactionIntentResponse, error)
+	GetTokenBalance(context.Context, *GetTokenBalanceRequest) (*GetTokenBalanceResponse, error)
 	mustEmbedUnimplementedBroadcastServiceServer()
 }
 
@@ -66,6 +79,9 @@ type UnimplementedBroadcastServiceServer struct{}
 
 func (UnimplementedBroadcastServiceServer) SendTransaction(context.Context, *TransactionIntentRequest) (*TransactionIntentResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendTransaction not implemented")
+}
+func (UnimplementedBroadcastServiceServer) GetTokenBalance(context.Context, *GetTokenBalanceRequest) (*GetTokenBalanceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTokenBalance not implemented")
 }
 func (UnimplementedBroadcastServiceServer) mustEmbedUnimplementedBroadcastServiceServer() {}
 func (UnimplementedBroadcastServiceServer) testEmbeddedByValue()                          {}
@@ -106,6 +122,24 @@ func _BroadcastService_SendTransaction_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BroadcastService_GetTokenBalance_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTokenBalanceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BroadcastServiceServer).GetTokenBalance(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BroadcastService_GetTokenBalance_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BroadcastServiceServer).GetTokenBalance(ctx, req.(*GetTokenBalanceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BroadcastService_ServiceDesc is the grpc.ServiceDesc for BroadcastService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -116,6 +150,10 @@ var BroadcastService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendTransaction",
 			Handler:    _BroadcastService_SendTransaction_Handler,
+		},
+		{
+			MethodName: "GetTokenBalance",
+			Handler:    _BroadcastService_GetTokenBalance_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

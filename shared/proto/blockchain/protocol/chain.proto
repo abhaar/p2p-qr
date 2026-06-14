@@ -48,9 +48,19 @@ message TransferResponse {
   string error = 3;
 }
 
+message GetTokenBalanceRequest {
+  string address = 1;
+  string contract_address = 2;
+}
+
+message GetTokenBalanceResponse {
+  string balance = 1;
+}
+
 service ProtocolService {
   rpc GetLatestBlock(GetLatestBlockRequest) returns (GetLatestBlockResponse);
   rpc GetBlockEvents(GetBlockEventsRequest) returns (BlockchainEvents);
   rpc PrepareTransaction(google.protobuf.Any) returns (signer.UnsignedEvmTransaction);
   rpc Transfer(signer.SignedTransaction) returns (TransferResponse);
+  rpc GetTokenBalance(GetTokenBalanceRequest) returns (GetTokenBalanceResponse);
 }
