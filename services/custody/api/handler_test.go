@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -74,23 +73,7 @@ func TestHandleGeneratePaymentQR(t *testing.T) {
 			t.Errorf("expected non-empty response payload string")
 		}
 
-		// Verify file was saved locally as HTML
-		expectedFile := filepath.Join("qrcodes", "qr_0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266_10.5.html")
-		if _, err := os.Stat(expectedFile); os.IsNotExist(err) {
-			t.Errorf("expected QR code HTML file to be saved at %s", expectedFile)
-		} else {
-			content, err := os.ReadFile(expectedFile)
-			if err != nil {
-				t.Fatalf("failed to read saved HTML file: %v", err)
-			}
-			htmlStr := string(content)
-			if !strings.Contains(htmlStr, payloadStr) {
-				t.Errorf("expected saved HTML file to contain the payload string")
-			}
-			if !strings.Contains(htmlStr, "data:image/png;base64,") {
-				t.Errorf("expected saved HTML file to contain the base64 image data")
-			}
-		}
+
 	})
 
 	t.Run("GET - missing parameters", func(t *testing.T) {
@@ -146,23 +129,7 @@ func TestHandleGeneratePaymentQR(t *testing.T) {
 			t.Errorf("expected non-empty response payload string")
 		}
 
-		// Verify file was saved locally as HTML
-		expectedFile := filepath.Join("qrcodes", "qr_0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266_123.45.html")
-		if _, err := os.Stat(expectedFile); os.IsNotExist(err) {
-			t.Errorf("expected QR code HTML file to be saved at %s", expectedFile)
-		} else {
-			content, err := os.ReadFile(expectedFile)
-			if err != nil {
-				t.Fatalf("failed to read saved HTML file: %v", err)
-			}
-			htmlStr := string(content)
-			if !strings.Contains(htmlStr, payloadStr) {
-				t.Errorf("expected saved HTML file to contain the payload string")
-			}
-			if !strings.Contains(htmlStr, "data:image/png;base64,") {
-				t.Errorf("expected saved HTML file to contain the base64 image data")
-			}
-		}
+
 	})
 
 	t.Run("POST - invalid JSON body", func(t *testing.T) {

@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -219,26 +217,8 @@ func (s *Server) handleGeneratePaymentQR(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Ensure qrcodes directory exists and save the file
-	dir := "qrcodes"
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		s.logger.Error("failed to create qrcodes directory", zap.Error(err))
-		s.writeError(w, http.StatusInternalServerError, "failed to initialize storage")
-		return
-	}
-
-	// Prepare base64-encoded image and HTML content
+	// Prepare base64-encoded image
 	base64Image := base64.StdEncoding.EncodeToString(png)
-	htmlContent := strings.ReplaceAll(qrHTMLTemplate, "{{.QR_IMAGE_BASE64}}", base64Image)
-	htmlContent = strings.ReplaceAll(htmlContent, "{{.PAYLOAD}}", qrContent)
-
-	filename := fmt.Sprintf("qr_%s_%s.html", address, normalizedAmount)
-	filePath := filepath.Join(dir, filename)
-	if err := os.WriteFile(filePath, []byte(htmlContent), 0644); err != nil {
-		s.logger.Error("failed to save QR HTML file", zap.Error(err))
-		s.writeError(w, http.StatusInternalServerError, "failed to save QR HTML file")
-		return
-	}
 
 	// Return JSON or raw text based on Accept header
 	if strings.Contains(r.Header.Get("Accept"), "application/json") {
