@@ -185,6 +185,10 @@ func (m *MockCustodyService) GetBalance(ctx context.Context, address, currency s
 	return domain.Balance{}, nil
 }
 
+func (m *MockCustodyService) GetAddresses(ctx context.Context) ([]string, error) {
+	return []string{"0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"}, nil
+}
+
 func (m *MockCustodyService) Transfer(ctx context.Context, intent domain.TransferIntent) (*domain.TransferResult, error) {
 	if m.TransferFunc != nil {
 		return m.TransferFunc(ctx, intent)

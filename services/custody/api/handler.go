@@ -240,11 +240,18 @@ func (s *Server) handleGeneratePaymentQR(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Return raw payload string in response
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write([]byte(qrContent)); err != nil {
-		s.logger.Error("failed to write raw payload response", zap.Error(err))
+	// Return JSON or raw text based on Accept header
+	if strings.Contains(r.Header.Get("Accept"), "application/json") {
+		s.writeJSON(w, http.StatusOK, GenerateQRResponse{
+			Payload: qrContent,
+			QRImage: base64Image,
+		})
+	} else {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte(qrContent)); err != nil {
+			s.logger.Error("failed to write raw payload response", zap.Error(err))
+		}
 	}
 }
 

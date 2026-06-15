@@ -90,6 +90,11 @@ func (s *CustodyService) GetBalance(ctx context.Context, address, currency strin
 	}, nil
 }
 
+// GetAddresses returns all custodied addresses from the address service.
+func (s *CustodyService) GetAddresses(ctx context.Context) ([]string, error) {
+	return s.addressService.GetCustodyAddresses(ctx, nil)
+}
+
 // Transfer initiates a token transfer by delegating to the broadcaster service.
 func (s *CustodyService) Transfer(ctx context.Context, intent domain.TransferIntent) (*domain.TransferResult, error) {
 	s.logger.Info("initiating transfer",

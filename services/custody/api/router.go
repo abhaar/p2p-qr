@@ -33,4 +33,6 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /payment-request/qr", s.handleGeneratePaymentQR)
 	mux.HandleFunc("POST /payment-request/qr", s.handleGeneratePaymentQR)
 	mux.HandleFunc("POST /transfer/qr", s.handleTransferFromQR)
+	mux.HandleFunc("GET /addresses", s.handleGetAddresses)
+	mux.HandleFunc("GET /", s.handleServeDashboard)
 }

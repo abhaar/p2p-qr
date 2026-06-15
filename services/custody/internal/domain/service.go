@@ -10,6 +10,9 @@ type CustodyService interface {
 
 	// Transfer executes a token transfer described by the given intent.
 	Transfer(ctx context.Context, intent TransferIntent) (*TransferResult, error)
+
+	// GetAddresses returns all custodied addresses.
+	GetAddresses(ctx context.Context) ([]string, error)
 }
 
 // Broadcaster abstracts the blockchain broadcaster service.
